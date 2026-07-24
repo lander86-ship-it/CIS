@@ -68,6 +68,12 @@
       </form>
       <p class="hint">Search returns matching CIS benchmarks. Click a result to select it, then
         press <strong>Generate policy</strong> to produce the SABIC Word document.</p>
+      <label class="row" style="gap:.5rem; font-size:.85rem; margin:.2rem 0 .4rem">
+        <input type="checkbox" id="polAi" checked />
+        <span>Draft narrative sections with AI (Claude) — Purpose, Scope, Roles &amp; Compliance
+          tailored to the benchmark. <strong>CIS controls stay verbatim.</strong>
+          <span id="aiBadge" class="subtle"></span></span>
+      </label>
       <div id="results" class="results"></div>
     </section>
 

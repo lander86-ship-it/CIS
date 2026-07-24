@@ -215,10 +215,26 @@ function selectRow(id) {
 
 // --- generate policy -------------------------------------------------------
 
+async function refreshAi() {
+  const badge = $("#aiBadge");
+  if (!badge) return;
+  try {
+    const h = await api("/api/health");
+    const ai = h.ai || {};
+    if (ai.available) {
+      badge.textContent = `(AI on · ${ai.model || "claude"})`;
+    } else {
+      badge.textContent = "(AI off — set ANTHROPIC_API_KEY to enable; built-in text is used meanwhile)";
+      if ($("#polAi")) $("#polAi").checked = false;
+    }
+  } catch { /* redirected */ }
+}
+
 async function generatePolicy(identifier, label) {
   const fd = new FormData();
   fd.append("identifier", identifier);
   fd.append("src_format", "xccdf");
+  fd.append("use_ai", $("#polAi") && $("#polAi").checked ? "true" : "false");
   log(`Generating Word policy for "${label || identifier}" (SABIC template)… this can take a while.`);
   const btns = document.querySelectorAll(".genbtn");
   btns.forEach((b) => (b.disabled = true));
@@ -226,7 +242,8 @@ async function generatePolicy(identifier, label) {
     const res = await api("/api/policy", { method: "POST", body: fd });
     if (res.ok) {
       const b = res.benchmark || {};
-      log(`Policy generated: ${res.file} — ${b.controls} controls in ${b.sections} sections.`, "ok");
+      const aiNote = res.ai_used ? " · narrative drafted by AI" : "";
+      log(`Policy generated: ${res.file} — ${b.controls} controls in ${b.sections} sections${aiNote}.`, "ok");
       await loadFiles();
     } else {
       log(res.stderr || res.detail || "Could not generate the policy.", "err");
@@ -256,6 +273,7 @@ $("#clearBtn").addEventListener("click", () => { consoleEl.textContent = "Ready.
 
 (async function init() {
   refreshSession();
+  refreshAi();
   const a = await refreshAuth();
   if (a.ok) catalogStatus();
   loadFiles();

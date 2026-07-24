@@ -14,7 +14,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
-from . import auth, catalog, cis, cis_parse, policy, workbench_login
+from . import auth, catalog, cis, cis_parse, llm, policy, workbench_login
 
 STATIC_DIR = Path(__file__).parent / "static"
 # Where an uploaded cookies.txt is stored before login.
@@ -116,6 +116,7 @@ def health():
         "cli_available": cis.cli_available(),
         "cli_version": res.stdout.strip() or res.stderr.strip(),
         "work_dir": str(cis.WORK_DIR),
+        "ai": llm.status(),
     }
 
 
@@ -271,6 +272,7 @@ def generate_policy(
     author: str = Form("Corporate Cybersecurity"),
     version: str = Form("1.0"),
     src_format: str = Form("xccdf"),
+    use_ai: bool = Form(True),
 ):
     """Generate a SABIC-styled Word policy from a selected CIS benchmark.
 
@@ -318,8 +320,16 @@ def generate_policy(
         author=author.strip() or "Corporate Cybersecurity",
         date=date.today().strftime("%d/%m/%Y"),
     )
+    # Optionally draft the narrative sections with Claude (falls back to static
+    # templates if unavailable or on any failure). Controls stay verbatim.
+    narrative = None
+    ai_used = False
+    if use_ai and llm.available():
+        narrative = llm.generate_narrative(bench, meta)
+        ai_used = narrative is not None
+
     try:
-        doc = policy.build_policy(bench, meta)
+        doc = policy.build_policy(bench, meta, narrative=narrative)
     except Exception as exc:  # noqa: BLE001
         return JSONResponse(
             {"ok": False, "stderr": f"Policy generation failed: {exc}"},
@@ -336,6 +346,7 @@ def generate_policy(
         "file": out_name,
         "download_url": f"/api/files/{out_name}",
         "source_format": fmt,
+        "ai_used": ai_used,
         "benchmark": {
             "id": bench.id, "title": bench.title, "version": bench.version,
             "platform": bench.platform, "sections": len(bench.sections),

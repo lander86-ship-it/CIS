@@ -8,3 +8,6 @@ requests>=2.31.0
 # Policy generator (SABIC .docx templating): lxml preserves the template's
 # namespaces/styles when rewriting the document body.
 lxml==5.3.0
+# Optional AI drafting of the policy narrative via the Claude API. The app runs
+# fine without it (static templates); enable by setting ANTHROPIC_API_KEY.
+anthropic==0.120.0

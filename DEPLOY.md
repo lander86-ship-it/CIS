@@ -34,6 +34,8 @@ En **Settings → Variables**, añade (los valores sensibles viven aquí, nunca 
 | `APP_SECRET` | una cadena aleatoria larga (ej. `openssl rand -hex 32`) | ✅ |
 | `APP_SESSION_TTL` | `86400` (opcional, 1 día) | — |
 | `CIS_COOKIES_B64` | base64 de tu `cookies.txt` (opcional, ver abajo) | — |
+| `ANTHROPIC_API_KEY` | tu API key de Anthropic (opcional; activa la redacción con IA de las secciones narrativas) | — |
+| `POLICY_LLM_MODEL` | modelo para la IA (def. `claude-opus-5`; `claude-sonnet-5` para abaratar) | — |
 
 > Las contraseñas no pueden contener `,` ni `:`.
 

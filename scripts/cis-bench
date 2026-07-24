@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+#
+# Convenience wrapper around the containerized CIS Benchmark CLI.
+# Runs the cis-bench image with the ./data and ./work volumes mounted,
+# so you can call it just like the native tool:
+#
+#   ./scripts/cis-bench auth login --cookies /data/cookies.txt
+#   ./scripts/cis-bench search "ubuntu 22"
+#   ./scripts/cis-bench get "ubuntu 22.04" --format xccdf --style cis -o /work/ubuntu.xml
+#
+# Paths inside the container:
+#   /data  -> ./data   (session cookies + catalog.db; persistent)
+#   /work  -> ./work   (exported files; grab them from the host)
+#
+set -euo pipefail
+
+# Resolve the repo root (parent of this script's directory).
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." &>/dev/null && pwd)"
+
+cd "${ROOT_DIR}"
+
+# Prefer docker compose (keeps env + volumes in one place); fall back to
+# plain `docker run` if compose is unavailable.
+if docker compose version &>/dev/null; then
+  exec docker compose run --rm cis-bench "$@"
+else
+  exec docker run --rm -it \
+    -v "${ROOT_DIR}/data:/data" \
+    -v "${ROOT_DIR}/work:/work" \
+    -e CIS_BENCH_ENV="${CIS_BENCH_ENV:-production}" \
+    -e CIS_BENCH_SSL_VERIFY="${CIS_BENCH_SSL_VERIFY:-true}" \
+    cis-bench:local "$@"
+fi

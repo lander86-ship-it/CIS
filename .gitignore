@@ -1,0 +1,18 @@
+# Runtime state persisted by the container (session cookies, catalog.db, .env)
+/data/*
+!/data/.gitkeep
+
+# Exported benchmarks
+/work/*
+!/work/.gitkeep
+
+# Secrets / auth material — never commit these
+.env
+*.cookies
+cookies.txt
+
+# OS / editor noise
+.DS_Store
+*.swp
+.idea/
+.vscode/

@@ -1,0 +1,21 @@
+# Keep the build context tiny and never bake secrets/state into the image.
+.git
+.gitignore
+README.md
+Makefile
+docs
+
+# Runtime state / mounted volumes — must NOT be copied into the image.
+data
+work
+
+# Local env / secrets
+.env
+*.cookies
+cookies.txt
+
+# Editor / OS noise
+.DS_Store
+.idea
+.vscode
+*.swp

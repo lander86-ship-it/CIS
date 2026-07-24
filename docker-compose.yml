@@ -1,0 +1,34 @@
+# docker-compose for the CIS Benchmark CLI (mitre/cis-bench)
+#
+# Usage examples:
+#   docker compose build
+#   docker compose run --rm cis-bench auth login --cookies /data/cookies.txt
+#   docker compose run --rm cis-bench auth status
+#   docker compose run --rm cis-bench search "ubuntu 22"
+#   docker compose run --rm cis-bench get "ubuntu 22.04" --format xccdf --style cis -o /work/ubuntu.xml
+#
+# Because this is a CLI (not a long-running server), use `run --rm` rather
+# than `up`. The `data` and `work` volumes persist your session + exports.
+
+services:
+  cis-bench:
+    build:
+      context: .
+      args:
+        # Bump to install a different release of the CLI.
+        CIS_BENCH_VERSION: "0.5.2"
+    image: cis-bench:local
+    # State (session cookies + SQLite catalog) persists in ./data.
+    # Exports land in ./work so you can grab them from the host.
+    volumes:
+      - ./data:/data
+      - ./work:/work
+    environment:
+      # production (default) -> /data/.cis-bench
+      CIS_BENCH_ENV: "production"
+      # Set to "false" only if you must talk to CIS WorkBench through a
+      # TLS-intercepting proxy. Leave "true" otherwise.
+      CIS_BENCH_SSL_VERIFY: "true"
+    # No network ports: this tool only makes outbound HTTPS calls.
+    # Keep the container from lingering after the command finishes.
+    restart: "no"

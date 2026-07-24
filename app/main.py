@@ -14,7 +14,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
-from . import auth, cis, cis_parse, policy
+from . import auth, catalog, cis, cis_parse, policy
 
 STATIC_DIR = Path(__file__).parent / "static"
 # Where an uploaded cookies.txt is stored before login.
@@ -48,6 +48,15 @@ def _bootstrap_cookies() -> None:
         cis.auth_login_with_cookies(dest)
         dest.unlink(missing_ok=True)
     except Exception:  # noqa: BLE001 - never block startup on this
+        pass
+
+
+@app.on_event("startup")
+def _bootstrap_catalog() -> None:
+    """Start loading the benchmark catalog in the background at boot."""
+    try:
+        catalog.ensure_loading()
+    except Exception:  # noqa: BLE001
         pass
 
 
@@ -155,6 +164,22 @@ def list_catalog():
     payload = res.as_dict()
     payload["json"] = res.json_payload()
     return payload
+
+
+@app.get("/api/catalog")
+def catalog_endpoint():
+    """Return the full benchmark catalog, pre-loading it if needed.
+
+    Response: {status: ready|refreshing|error, benchmarks: [...], error}.
+    The UI polls this until status == "ready".
+    """
+    items, res = catalog.get_benchmarks()
+    if items:
+        return {"status": "ready", "count": len(items), "benchmarks": items}
+    catalog.ensure_loading()
+    st = catalog.status()
+    status = st["status"] if st["status"] in ("refreshing", "error") else "refreshing"
+    return {"status": status, "error": st.get("error", ""), "benchmarks": []}
 
 
 @app.post("/api/export")

@@ -67,13 +67,16 @@ docker compose up ui        # construye la imagen y arranca el servidor
 # o en segundo plano:  docker compose up -d ui   /   make up
 ```
 
-Abre **http://localhost:8000**. La UI tiene 4 pasos:
+Abre **http://localhost:8000** (verás la pantalla de login). El flujo es:
 
-1. **Autenticación** — sube tu `cookies.txt` (ver más abajo).
-2. **Catálogo** — botón *Refrescar catálogo* (primera vez / periódicamente).
-3. **Buscar** — busca benchmarks por texto o `platform-type`.
-4. **Exportar** — elige ID/consulta, formato y estilo → genera un archivo
-   descargable (aparece en *Archivos exportados*).
+1. **Inicia sesión** (usuario/contraseña de `APP_USERS`).
+2. El **catálogo de benchmarks se precarga automáticamente** (si CIS WorkBench
+   está autenticado — las cookies se cargan solas desde `CIS_COOKIES_B64`, o
+   súbelas en el panel *Session*). La primera carga puede tardar unos minutos y
+   se persiste en `/data`.
+3. **Filtra** el catálogo y **selecciona** un benchmark → queda marcado.
+4. Pulsa **Generate policy** en esa fila → genera el Word con la plantilla SABIC
+   (aparece en *Generated policies* para descargar).
 
 Parar: `docker compose down` (o `make down`).
 
@@ -188,6 +191,7 @@ La UI consume esta API (útil también para automatizar):
 | `GET`  | `/api/auth/status` | Estado de autenticación |
 | `POST` | `/api/auth/login` | Login (multipart: `cookies`) |
 | `POST` | `/api/catalog/refresh` | Refrescar catálogo |
+| `GET`  | `/api/catalog` | Catálogo completo (precarga en 2º plano; `status` ready/refreshing/error) |
 | `GET`  | `/api/search?q=&platform_type=` | Buscar benchmarks |
 | `GET`  | `/api/list` | Listar catálogo (JSON) |
 | `POST` | `/api/export` | Exportar (`identifier`, `fmt`, `style`, `filename`) |

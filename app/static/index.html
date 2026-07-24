@@ -12,11 +12,10 @@
       <span class="logo">🛡️</span>
       <div>
         <h1>CIS Benchmark Console</h1>
-        <p class="subtitle">Web interface for the <code>cis-bench</code> CLI</p>
+        <p class="subtitle">Select a benchmark and generate a SABIC policy</p>
       </div>
     </div>
     <div class="status">
-      <span id="cliBadge" class="badge badge--muted">checking…</span>
       <span id="authBadge" class="badge badge--muted">auth: —</span>
       <span id="userBadge" class="badge badge--muted"></span>
       <button id="logoutBtn" class="btn btn--ghost">Log out</button>
@@ -24,101 +23,14 @@
   </header>
 
   <main class="grid">
-    <!-- Authentication -->
-    <section class="card">
-      <h2>1 · CIS WorkBench authentication</h2>
-      <p class="hint">
-        Connect to
-        <a href="https://workbench.cisecurity.org/" target="_blank" rel="noreferrer">CIS WorkBench</a>
-        one of two ways. Not sure how? &rarr;
-        <a href="/auth-guide.html" target="_blank" rel="noreferrer"><strong>Step-by-step guide</strong></a>.
-      </p>
-
-      <p class="auth-label">Option A · Automatically from your browser</p>
-      <div class="row">
-        <select id="browser" class="grow" aria-label="Browser">
-          <option value="chrome" selected>Chrome</option>
-          <option value="firefox">Firefox</option>
-          <option value="edge">Edge</option>
-          <option value="brave">Brave</option>
-          <option value="safari">Safari</option>
-        </select>
-        <button type="submit" class="btn" id="btnBrowser">Sign in</button>
-      </div>
-      <p class="subtle">Requires running the app in native mode on your machine.</p>
-
-      <hr class="divider" />
-      <p class="auth-label">Option B · Upload <code>cookies.txt</code> (always works)</p>
-      <form id="loginForm" class="row">
-        <input type="file" id="cookiesFile" accept=".txt" required />
-        <button type="submit" class="btn">Sign in</button>
-      </form>
-      <button id="authStatusBtn" class="btn btn--ghost">Check status</button>
-    </section>
-
-    <!-- Catalog -->
-    <section class="card">
-      <h2>2 · Catalog</h2>
-      <p class="hint">Download/update the benchmark index (first run and periodically).</p>
-      <button id="refreshBtn" class="btn">Refresh catalog</button>
-    </section>
-
-    <!-- Search -->
+    <!-- Policy options -->
     <section class="card card--wide">
-      <h2>3 · Search benchmarks</h2>
-      <form id="searchForm" class="row">
-        <input type="text" id="query" placeholder="e.g. ubuntu 22" class="grow" />
-        <input type="text" id="platformType" placeholder="platform-type (optional)" />
-        <button type="submit" class="btn">Search</button>
-      </form>
-      <div id="searchResults" class="results"></div>
-    </section>
-
-    <!-- Export -->
-    <section class="card card--wide">
-      <h2>4 · Export / Download</h2>
-      <form id="exportForm" class="grid-form">
-        <label>ID or query
-          <input type="text" id="identifier" placeholder="23598  or  ubuntu 22.04" required />
-        </label>
-        <label>Format
-          <select id="fmt">
-            <option value="xccdf">XCCDF (XML)</option>
-            <option value="yaml">YAML</option>
-            <option value="csv">CSV</option>
-            <option value="json">JSON</option>
-            <option value="markdown">Markdown</option>
-          </select>
-        </label>
-        <label id="styleWrap">Style (XCCDF only)
-          <select id="style">
-            <option value="cis">CIS</option>
-            <option value="disa">DISA</option>
-            <option value="stig">STIG</option>
-          </select>
-        </label>
-        <label>File name (optional)
-          <input type="text" id="filename" placeholder="ubuntu.xml" />
-        </label>
-        <button type="submit" class="btn">Export</button>
-      </form>
-    </section>
-
-    <!-- Generate policy (SABIC template) -->
-    <section class="card card--wide">
-      <h2>5 · Generate policy (Word · SABIC template)</h2>
-      <p class="hint">
-        Produce a Word document using SABIC's <strong>template, cover page and branding</strong>
-        filled with the selected CIS benchmark: Purpose, Scope, Roles &amp; Responsibilities,
-        Security Requirements (controls with rationale, audit and remediation), Compliance &amp;
-        Exceptions and References.
-      </p>
+      <h2>Policy options</h2>
+      <p class="hint">Applied when you click <strong>Generate policy</strong> on a benchmark below.
+        Leave the title blank to derive it from the benchmark name.</p>
       <div class="grid-form">
-        <label class="full">CIS benchmark ID or name
-          <input type="text" id="polId" placeholder="23598  or  Ubuntu 22.04" />
-        </label>
         <label>Policy title (optional)
-          <input type="text" id="polTitle" placeholder="Ubuntu 22.04 Security Hardening Standard" />
+          <input type="text" id="polTitle" placeholder="e.g. Ubuntu 22.04 Security Hardening Standard" />
         </label>
         <label>Author
           <input type="text" id="polAuthor" placeholder="Corporate Cybersecurity" />
@@ -132,17 +44,46 @@
             <option value="json">JSON</option>
           </select>
         </label>
-        <button type="button" class="btn full" id="btnPolicy">Generate Word policy (.docx)</button>
       </div>
     </section>
 
-    <!-- Files -->
+    <!-- Catalog -->
     <section class="card card--wide">
       <div class="row between">
-        <h2>Exported files</h2>
+        <h2>Benchmark catalog</h2>
+        <div class="row">
+          <span id="catalogStatus" class="subtle">loading…</span>
+          <button id="reloadBtn" class="btn btn--ghost">Reload</button>
+        </div>
+      </div>
+      <input type="search" id="catalogFilter" class="grow" placeholder="Filter by name, platform or ID (e.g. ubuntu, windows, 23598)…" />
+      <div id="catalog" class="results">
+        <p class="hint" id="catalogHint">Loading catalog…</p>
+      </div>
+    </section>
+
+    <!-- Exported policies -->
+    <section class="card card--wide">
+      <div class="row between">
+        <h2>Generated policies</h2>
         <button id="filesBtn" class="btn btn--ghost">Refresh</button>
       </div>
       <ul id="fileList" class="files"><li class="empty">No files yet.</li></ul>
+    </section>
+
+    <!-- Session (auth) -->
+    <section class="card card--wide">
+      <h2>Session</h2>
+      <p class="hint" id="sessionHint">
+        CIS WorkBench cookies are loaded automatically on the server.
+        If the session expires, upload a fresh <code>cookies.txt</code> here.
+        <a href="/auth-guide.html" target="_blank" rel="noreferrer">How to get it</a>.
+      </p>
+      <form id="cookiesForm" class="row">
+        <input type="file" id="cookiesFile" accept=".txt" />
+        <button type="submit" class="btn btn--ghost">Update cookies</button>
+        <button type="button" id="authStatusBtn" class="btn btn--ghost">Check status</button>
+      </form>
     </section>
 
     <!-- Console -->
@@ -157,7 +98,7 @@
 
   <footer class="foot">
     Wraps <a href="https://github.com/mitre/cis-bench" target="_blank" rel="noreferrer">mitre/cis-bench</a>
-    (Apache 2.0). This UI only orchestrates the CLI.
+    (Apache 2.0) · SABIC policy template.
   </footer>
 
   <script src="/app.js"></script>

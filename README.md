@@ -107,6 +107,10 @@ sudo ln -s "$(pwd)/scripts/cis-bench" /usr/local/bin/cis-bench
 
 ## Autenticación (headless con cookies)
 
+> 📖 **¿No sabes qué son estas cookies ni cómo obtenerlas?** Lee la
+> [**guía paso a paso**](docs/AUTENTICACION.md) (también accesible desde la UI,
+> en el paso *Autenticación*, o en `http://localhost:8000/guia-autenticacion.html`).
+
 Ni el contenedor ni el servidor tienen navegador, así que se usa el método
 headless oficial con un archivo de cookies en **formato Netscape**:
 

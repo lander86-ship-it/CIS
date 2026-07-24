@@ -52,14 +52,26 @@ $("#logoutBtn").addEventListener("click", async () => {
   await fetch("/api/session/logout", { method: "POST" });
   window.location.href = "/login";
 });
-async function refreshAuth() {
+function setAuthUI(active) {
   const badge = $("#authBadge");
+  badge.textContent = active ? "auth: active" : "auth: no session";
+  badge.className = "badge " + (active ? "badge--ok" : "badge--err");
+  const wb = $("#wbStatus");
+  if (wb) {
+    wb.textContent = active ? "session active" : "no session — upload cookies";
+    wb.className = "badge " + (active ? "badge--ok" : "badge--err");
+  }
+  const card = $("#wbCard");
+  if (card) card.classList.toggle("card--attention", !active);
+}
+
+async function refreshAuth() {
   try {
     const res = await api("/api/auth/status");
-    badge.textContent = res.ok ? "auth: active" : "auth: no session";
-    badge.className = "badge " + (res.ok ? "badge--ok" : "badge--err");
+    setAuthUI(!!res.ok);
     return res;
-  } catch { badge.textContent = "auth: ?"; badge.className = "badge badge--muted"; }
+  } catch { setAuthUI(false); }
+  return { ok: false };
 }
 
 // --- catalog ---------------------------------------------------------------
@@ -67,6 +79,14 @@ async function refreshAuth() {
 let pollTimer = null, pollCount = 0;
 
 async function loadCatalog() {
+  // The catalog needs an active WorkBench session; prompt if missing.
+  const a = await refreshAuth();
+  if (!a.ok) {
+    clearTimeout(pollTimer);
+    $("#catalogStatus").textContent = "no session";
+    $("#catalog").innerHTML = `<p class="hint">Upload your <code>cookies.txt</code> in the <strong>CIS WorkBench session</strong> panel above to load the catalog.</p>`;
+    return;
+  }
   $("#catalogStatus").textContent = "loading…";
   try {
     const res = await api("/api/catalog");
@@ -213,6 +233,5 @@ $("#clearBtn").addEventListener("click", () => { consoleEl.textContent = "Ready.
 // --- init ------------------------------------------------------------------
 
 refreshSession();
-refreshAuth();
-loadCatalog();
+loadCatalog();   // refreshes auth first and gates on it
 loadFiles();

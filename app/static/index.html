@@ -23,6 +23,24 @@
   </header>
 
   <main class="grid">
+    <!-- CIS WorkBench session (prominent) -->
+    <section class="card card--wide" id="wbCard">
+      <div class="row between">
+        <h2>1 · CIS WorkBench session</h2>
+        <span id="wbStatus" class="badge badge--muted">checking…</span>
+      </div>
+      <p class="hint" id="sessionHint">
+        To load the catalog and generate policies, the server needs an active
+        CIS WorkBench session. Upload your <code>cookies.txt</code> below.
+        <a href="/auth-guide.html" target="_blank" rel="noreferrer">How to get it</a>.
+      </p>
+      <form id="cookiesForm" class="row">
+        <input type="file" id="cookiesFile" accept=".txt" class="grow" required />
+        <button type="submit" class="btn">Upload cookies &amp; sign in</button>
+        <button type="button" id="authStatusBtn" class="btn btn--ghost">Check status</button>
+      </form>
+    </section>
+
     <!-- Policy options -->
     <section class="card card--wide">
       <h2>Policy options</h2>
@@ -69,21 +87,6 @@
         <button id="filesBtn" class="btn btn--ghost">Refresh</button>
       </div>
       <ul id="fileList" class="files"><li class="empty">No files yet.</li></ul>
-    </section>
-
-    <!-- Session (auth) -->
-    <section class="card card--wide">
-      <h2>Session</h2>
-      <p class="hint" id="sessionHint">
-        CIS WorkBench cookies are loaded automatically on the server.
-        If the session expires, upload a fresh <code>cookies.txt</code> here.
-        <a href="/auth-guide.html" target="_blank" rel="noreferrer">How to get it</a>.
-      </p>
-      <form id="cookiesForm" class="row">
-        <input type="file" id="cookiesFile" accept=".txt" />
-        <button type="submit" class="btn btn--ghost">Update cookies</button>
-        <button type="button" id="authStatusBtn" class="btn btn--ghost">Check status</button>
-      </form>
     </section>
 
     <!-- Console -->

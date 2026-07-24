@@ -192,3 +192,6 @@ td.rowbtn { text-align: right; white-space: nowrap; }
 .btn.sm { padding: 0.35rem 0.7rem; font-size: 0.8rem; }
 .chip { display: inline-block; font-size: 0.72rem; font-weight: 600; padding: 0.14rem 0.5rem;
   border-radius: 999px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+
+.card--attention { border-color: color-mix(in srgb, var(--err) 55%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--err) 40%, transparent); }

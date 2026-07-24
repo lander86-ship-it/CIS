@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign in · CIS Benchmark Console</title>
+  <style>
+    :root {
+      --bg:#0d131e; --surface:#151d2b; --surface-2:#1d2636; --border:#2a3547;
+      --text:#e8edf6; --muted:#8fa0b8; --accent:#3ea6ff; --accent-ink:#05121f; --err:#f87171;
+      --mono: ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    }
+    @media (prefers-color-scheme: light) {
+      :root { --bg:#eef1f7; --surface:#fff; --surface-2:#f3f6fc; --border:#d8e0ee;
+        --text:#14203a; --muted:#5a6b86; --accent:#1f6fe0; --accent-ink:#fff; --err:#dc2626; }
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center;
+      background:var(--bg); color:var(--text);
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+    .card { width:min(92vw,380px); background:var(--surface); border:1px solid var(--border);
+      border-radius:14px; padding:1.8rem 1.6rem; box-shadow:0 20px 50px -25px rgba(0,0,0,.6); }
+    .brand { display:flex; align-items:center; gap:.7rem; margin-bottom:1.3rem; }
+    .shield { width:44px; height:44px; border-radius:12px; display:grid; place-items:center;
+      font-size:1.4rem; background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 30%,var(--surface-2)),var(--surface-2));
+      border:1px solid color-mix(in srgb,var(--accent) 45%,var(--border)); }
+    h1 { font-size:1.15rem; margin:0; letter-spacing:-.01em; }
+    .eyebrow { margin:0; font-family:var(--mono); font-size:.66rem; letter-spacing:.18em;
+      text-transform:uppercase; color:var(--accent); }
+    label { display:block; font-size:.78rem; color:var(--muted); font-weight:600; margin:.9rem 0 .3rem; }
+    input { width:100%; background:var(--surface-2); border:1px solid var(--border); color:var(--text);
+      border-radius:9px; padding:.6rem .7rem; font-size:.95rem; font-family:inherit; }
+    input:focus { outline:2px solid var(--accent); border-color:transparent; }
+    button { width:100%; margin-top:1.3rem; background:var(--accent); color:var(--accent-ink);
+      border:0; border-radius:9px; padding:.7rem; font-size:.95rem; font-weight:700; cursor:pointer; }
+    button:hover { filter:brightness(1.08); }
+    button:disabled { opacity:.6; cursor:progress; }
+    .err { color:var(--err); font-size:.82rem; margin-top:.9rem; min-height:1.1em; }
+    .foot { color:var(--muted); font-size:.72rem; text-align:center; margin-top:1.1rem; }
+  </style>
+</head>
+<body>
+  <form class="card" id="loginForm" autocomplete="on">
+    <div class="brand">
+      <div class="shield">🛡️</div>
+      <div>
+        <p class="eyebrow">CIS · Security Benchmarks</p>
+        <h1>Sign in</h1>
+      </div>
+    </div>
+    <label for="username">Username</label>
+    <input id="username" name="username" type="text" required autofocus autocomplete="username" />
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password" />
+    <button type="submit" id="submit">Sign in</button>
+    <div class="err" id="err"></div>
+    <p class="foot">CIS Benchmark Console — authorized users only.</p>
+  </form>
+  <script>
+    const form = document.getElementById("loginForm");
+    const err = document.getElementById("err");
+    const btn = document.getElementById("submit");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      err.textContent = "";
+      btn.disabled = true;
+      const fd = new FormData();
+      fd.append("username", document.getElementById("username").value);
+      fd.append("password", document.getElementById("password").value);
+      try {
+        const r = await fetch("/api/session/login", { method: "POST", body: fd });
+        if (r.ok) { window.location.href = "/"; return; }
+        const j = await r.json().catch(() => ({}));
+        err.textContent = j.error || "Sign in failed.";
+      } catch (_) {
+        err.textContent = "Network error. Please try again.";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -46,6 +46,7 @@ RUN cis-bench --version || true
 
 EXPOSE 8000
 
-# Default: start the web UI. Override the entrypoint for CLI-only use
-# (see the `cli` service in docker-compose.yml).
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default: start the web UI. Binds to $PORT when set (Railway/Render/Fly set it),
+# otherwise 8000. Shell form so the variable is expanded at runtime.
+# Override the entrypoint for CLI-only use (see the `cli` service in compose).
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

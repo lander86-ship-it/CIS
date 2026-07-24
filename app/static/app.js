@@ -20,11 +20,12 @@ function showResult(res) {
   if (res.command) log(`$ cis-bench ${res.command.replace(/^cis-bench\s*/, "")}`);
   if (res.stdout && res.stdout.trim()) log(res.stdout.trim(), res.ok ? "ok" : "");
   if (res.stderr && res.stderr.trim()) log(res.stderr.trim(), res.ok ? "" : "err");
-  if (!res.stdout && !res.stderr) log(res.ok ? "OK" : `Fallo (código ${res.returncode})`, res.ok ? "ok" : "err");
+  if (!res.stdout && !res.stderr) log(res.ok ? "OK" : `Failed (code ${res.returncode})`, res.ok ? "ok" : "err");
 }
 
 async function api(path, opts = {}) {
   const r = await fetch(path, opts);
+  if (r.status === 401) { window.location.href = "/login"; throw new Error("unauthenticated"); }
   const ct = r.headers.get("content-type") || "";
   if (ct.includes("application/json")) return r.json();
   return { ok: r.ok, stdout: await r.text(), stderr: "", returncode: r.ok ? 0 : 1 };
@@ -35,7 +36,22 @@ function busy(btn, on) {
   btn.disabled = on;
 }
 
-// --- Health + auth badges --------------------------------------------------
+// --- Session / health / auth badges ---------------------------------------
+
+async function refreshSession() {
+  try {
+    const s = await api("/api/session");
+    if (s.user) {
+      $("#userBadge").textContent = s.user;
+      $("#userBadge").className = "badge badge--muted";
+    }
+  } catch { /* redirected to /login */ }
+}
+
+$("#logoutBtn").addEventListener("click", async () => {
+  await fetch("/api/session/logout", { method: "POST" });
+  window.location.href = "/login";
+});
 
 async function refreshHealth() {
   try {
@@ -45,11 +61,11 @@ async function refreshHealth() {
       badge.textContent = `CLI ${h.cli_version || "ok"}`;
       badge.className = "badge badge--ok";
     } else {
-      badge.textContent = "CLI no encontrada";
+      badge.textContent = "CLI not found";
       badge.className = "badge badge--err";
     }
   } catch {
-    $("#cliBadge").textContent = "servidor sin respuesta";
+    $("#cliBadge").textContent = "server unreachable";
     $("#cliBadge").className = "badge badge--err";
   }
 }
@@ -58,7 +74,7 @@ async function refreshAuth() {
   const badge = $("#authBadge");
   try {
     const res = await api("/api/auth/status");
-    badge.textContent = res.ok ? "auth: activa" : "auth: no";
+    badge.textContent = res.ok ? "auth: active" : "auth: no";
     badge.className = "badge " + (res.ok ? "badge--ok" : "badge--err");
     return res;
   } catch {
@@ -69,21 +85,20 @@ async function refreshAuth() {
 
 // --- Handlers --------------------------------------------------------------
 
-$("#browserForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const btn = e.submitter;
+$("#btnBrowser").addEventListener("click", async (e) => {
+  const btn = e.target;
   const browser = $("#browser").value;
   const fd = new FormData();
   fd.append("browser", browser);
   busy(btn, true);
-  log(`Extrayendo cookies de ${browser}…`);
+  log(`Extracting cookies from ${browser}…`);
   try {
     const res = await api("/api/auth/login-browser", { method: "POST", body: fd });
     showResult(res);
     if (!res.ok) {
-      log("Si falla: asegúrate de estar en modo nativo (./run-local.sh), " +
-          "de haber iniciado sesión en WorkBench en ese navegador, y prueba a " +
-          "cerrarlo. Si sigue fallando, usa la Opción B (cookies.txt).", "err");
+      log("If this fails: make sure you're in native mode (./run-local.sh), that " +
+          "you're signed in to WorkBench in that browser, and try closing it. " +
+          "Otherwise use Option B (cookies.txt).", "err");
     }
     await refreshAuth();
   } finally {
@@ -99,7 +114,7 @@ $("#loginForm").addEventListener("submit", async (e) => {
   const fd = new FormData();
   fd.append("cookies", file);
   busy(btn, true);
-  log("Subiendo cookies e iniciando sesión…");
+  log("Uploading cookies and signing in…");
   try {
     const res = await api("/api/auth/login", { method: "POST", body: fd });
     showResult(res);
@@ -118,7 +133,7 @@ $("#authStatusBtn").addEventListener("click", async (e) => {
 
 $("#refreshBtn").addEventListener("click", async (e) => {
   busy(e.target, true);
-  log("Refrescando catálogo (puede tardar)…");
+  log("Refreshing catalog (this can take a while)…");
   try {
     showResult(await api("/api/catalog/refresh", { method: "POST" }));
   } finally {
@@ -134,7 +149,7 @@ $("#searchForm").addEventListener("submit", async (e) => {
   let url = `/api/search?q=${q}`;
   if (pt) url += `&platform_type=${encodeURIComponent(pt)}`;
   busy(btn, true);
-  log(`Buscando "${$("#query").value.trim()}"…`);
+  log(`Searching "${$("#query").value.trim()}"…`);
   try {
     const res = await api(url);
     renderSearch(res);
@@ -156,7 +171,7 @@ function renderSearch(res) {
   } else if (res.stdout && res.stdout.trim()) {
     box.innerHTML = "";
   } else {
-    box.innerHTML = `<p class="hint">Sin resultados.</p>`;
+    box.innerHTML = `<p class="hint">No results.</p>`;
   }
 }
 
@@ -174,12 +189,12 @@ $("#exportForm").addEventListener("submit", async (e) => {
   if ($("#fmt").value === "xccdf") fd.append("style", $("#style").value);
   if ($("#filename").value.trim()) fd.append("filename", $("#filename").value.trim());
   busy(btn, true);
-  log(`Exportando "${$("#identifier").value.trim()}" a ${$("#fmt").value}…`);
+  log(`Exporting "${$("#identifier").value.trim()}" to ${$("#fmt").value}…`);
   try {
     const res = await api("/api/export", { method: "POST", body: fd });
     showResult(res);
     if (res.download_url) {
-      log(`Archivo generado: ${res.file}`, "ok");
+      log(`File generated: ${res.file}`, "ok");
       await loadFiles();
     }
   } finally {
@@ -190,7 +205,7 @@ $("#exportForm").addEventListener("submit", async (e) => {
 $("#btnPolicy").addEventListener("click", async (e) => {
   const btn = e.target;
   const id = $("#polId").value.trim();
-  if (!id) { log("Indica el ID o nombre del benchmark CIS para la política.", "err"); return; }
+  if (!id) { log("Enter the CIS benchmark ID or name for the policy.", "err"); return; }
   const fd = new FormData();
   fd.append("identifier", id);
   if ($("#polTitle").value.trim()) fd.append("title", $("#polTitle").value.trim());
@@ -198,15 +213,15 @@ $("#btnPolicy").addEventListener("click", async (e) => {
   if ($("#polVersion").value.trim()) fd.append("version", $("#polVersion").value.trim());
   fd.append("src_format", $("#polFormat").value);
   busy(btn, true);
-  log(`Generando política Word desde "${id}" (plantilla SABIC)… esto puede tardar.`);
+  log(`Generating Word policy from "${id}" (SABIC template)… this can take a while.`);
   try {
     const res = await api("/api/policy", { method: "POST", body: fd });
     if (res.ok) {
       const b = res.benchmark || {};
-      log(`Política generada: ${res.file} — ${b.controls} controles en ${b.sections} secciones (${b.title}).`, "ok");
+      log(`Policy generated: ${res.file} — ${b.controls} controls in ${b.sections} sections (${b.title}).`, "ok");
       await loadFiles();
     } else {
-      log(res.stderr || res.detail || "No se pudo generar la política.", "err");
+      log(res.stderr || res.detail || "Could not generate the policy.", "err");
     }
   } finally {
     busy(btn, false);
@@ -214,13 +229,13 @@ $("#btnPolicy").addEventListener("click", async (e) => {
 });
 
 $("#filesBtn").addEventListener("click", loadFiles);
-$("#clearBtn").addEventListener("click", () => { consoleEl.textContent = "Listo."; });
+$("#clearBtn").addEventListener("click", () => { consoleEl.textContent = "Ready."; });
 
 async function loadFiles() {
   const { files } = await api("/api/files");
   const list = $("#fileList");
   if (!files || !files.length) {
-    list.innerHTML = `<li class="empty">Sin archivos todavía.</li>`;
+    list.innerHTML = `<li class="empty">No files yet.</li>`;
     return;
   }
   list.innerHTML = files.map((f) =>
@@ -236,6 +251,7 @@ function fmtSize(n) {
 
 // --- Init ------------------------------------------------------------------
 
+refreshSession();
 refreshHealth();
 refreshAuth();
 loadFiles();

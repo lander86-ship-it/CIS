@@ -13,8 +13,15 @@ Puedes ejecutarlo de tres maneras, todas **en local / on-premise**:
 | 🌐 **Web UI (nativo)** | `./run-local.sh` → http://localhost:8000 | Python 3.12+ |
 | ⌨️ **CLI (Docker)** | `docker compose run --rm cli <args>` | Docker |
 
-No expone servicios a Internet: solo hace peticiones **HTTPS salientes** a CIS
-WorkBench. El servidor web escucha en `localhost:8000`.
+El servidor web escucha en `$PORT` (o `localhost:8000` en local) y hace
+peticiones **HTTPS salientes** a CIS WorkBench.
+
+> 🔐 **Login**: la UI (en inglés) está protegida por usuario/contraseña. Los
+> usuarios se configuran con la variable `APP_USERS` (formato
+> `user:pass,user:pass`) — ver `.env.example`. Nunca se commitea la contraseña real.
+>
+> 🚀 **Desplegar a la nube (URL pública)**: ver **[DEPLOY.md](DEPLOY.md)**
+> (Railway / Render / Fly).
 
 ---
 

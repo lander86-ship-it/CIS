@@ -2,26 +2,99 @@
 
 from __future__ import annotations
 
+import base64
 import os
 import re
 from datetime import date
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import (
+    FileResponse, JSONResponse, RedirectResponse, Response,
+)
 from fastapi.staticfiles import StaticFiles
 
-from . import cis, cis_parse, policy
+from . import auth, cis, cis_parse, policy
 
 STATIC_DIR = Path(__file__).parent / "static"
 # Where an uploaded cookies.txt is stored before login.
 DATA_DIR = Path(os.environ.get("HOME", "/data")) / ".cis-bench"
+
+# Paths reachable without a session (login page + its submit + favicon).
+PUBLIC_PATHS = {"/login", "/api/session/login", "/favicon.ico"}
 
 app = FastAPI(
     title="CIS Benchmark UI",
     description="Web interface for the mitre/cis-bench CLI.",
     version="1.0.0",
 )
+
+
+@app.on_event("startup")
+def _bootstrap_cookies() -> None:
+    """Optionally pre-authenticate from a base64 cookies.txt secret.
+
+    Set CIS_COOKIES_B64 to the base64 of a Netscape cookies.txt to have the
+    server log in to CIS WorkBench on startup — handy for a headless deploy
+    without committing the cookies. Best-effort; failures are non-fatal.
+    """
+    blob = os.environ.get("CIS_COOKIES_B64")
+    if not blob:
+        return
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        dest = DATA_DIR / "cookies.txt"
+        dest.write_bytes(base64.b64decode(blob))
+        cis.auth_login_with_cookies(dest)
+        dest.unlink(missing_ok=True)
+    except Exception:  # noqa: BLE001 - never block startup on this
+        pass
+
+
+@app.middleware("http")
+async def _require_session(request: Request, call_next):
+    path = request.url.path
+    if path in PUBLIC_PATHS or auth.read_session(
+            request.cookies.get(auth.COOKIE_NAME)):
+        return await call_next(request)
+    if path.startswith("/api/"):
+        return JSONResponse({"detail": "authentication required"},
+                            status_code=401)
+    return RedirectResponse("/login", status_code=302)
+
+
+# --- Authentication --------------------------------------------------------
+
+
+@app.get("/login")
+def login_page():
+    return FileResponse(STATIC_DIR / "login.html")
+
+
+@app.post("/api/session/login")
+def session_login(response: Response, username: str = Form(...),
+                  password: str = Form(...)):
+    if not auth.verify_user(username, password):
+        return JSONResponse({"ok": False, "error": "Invalid credentials"},
+                            status_code=401)
+    token = auth.create_session(username.strip())
+    resp = JSONResponse({"ok": True, "user": username.strip()})
+    resp.set_cookie(auth.COOKIE_NAME, token, httponly=True, samesite="lax",
+                    max_age=86400, path="/")
+    return resp
+
+
+@app.post("/api/session/logout")
+def session_logout():
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(auth.COOKIE_NAME, path="/")
+    return resp
+
+
+@app.get("/api/session")
+def session_info(request: Request):
+    user = auth.read_session(request.cookies.get(auth.COOKIE_NAME))
+    return {"authenticated": bool(user), "user": user}
 
 
 # --- API -------------------------------------------------------------------

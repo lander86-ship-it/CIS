@@ -26,6 +26,12 @@ x-common: &common
   environment:
     CIS_BENCH_ENV: "production"
     CIS_BENCH_SSL_VERIFY: "true"
+    # Web UI login. Set the real values in .env (gitignored). The default only
+    # includes a throwaway user so the sensitive password never lands in git.
+    APP_USERS: "${APP_USERS:-Lander:1234}"
+    APP_SECRET: "${APP_SECRET:-}"
+    APP_SESSION_TTL: "${APP_SESSION_TTL:-86400}"
+    CIS_COOKIES_B64: "${CIS_COOKIES_B64:-}"
 
 services:
   ui:

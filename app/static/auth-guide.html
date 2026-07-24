@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Authentication guide · CIS Benchmark Console</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .doc { max-width: 780px; margin: 0 auto; padding: 1.5rem; }
+    .doc .card { padding: 1.5rem 1.75rem; }
+    .doc h2 { margin-top: 1.6rem; }
+    .doc ol { padding-left: 1.2rem; }
+    .doc li { margin: 0.4rem 0; }
+    .steps li { margin: 0.7rem 0; }
+    .back { display: inline-block; margin-bottom: 1rem; }
+    .note { background: var(--surface-2); border-left: 3px solid var(--accent);
+            padding: 0.7rem 0.9rem; border-radius: 6px; margin: 0.9rem 0; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🔑</span>
+      <div>
+        <h1>Authentication guide</h1>
+        <p class="subtitle">How to obtain your CIS WorkBench <code>cookies.txt</code></p>
+      </div>
+    </div>
+  </header>
+
+  <main class="doc">
+    <a class="back btn btn--ghost" href="/">&larr; Back to the app</a>
+
+    <section class="card">
+      <h2>Why is this needed?</h2>
+      <p><a href="https://workbench.cisecurity.org/" target="_blank" rel="noreferrer">CIS WorkBench</a>
+        requires you to sign in before downloading benchmarks. The tool does not store your
+        username or password: instead it reuses the <strong>session you already opened in your
+        browser</strong>, represented by <em>session cookies</em>.</p>
+      <div class="note">
+        A session cookie is a temporary "pass" that says <em>"this user is already
+        authenticated"</em>. It is <strong>not your password</strong> and it expires over time.
+        When it does, just repeat these steps.
+      </div>
+
+      <h2>Step by step — Chrome / Edge / Brave</h2>
+      <ol class="steps">
+        <li><strong>Install a cookie-export extension.</strong>
+          Recommended: <em>"Get cookies.txt LOCALLY"</em> (Chrome Web Store). It is open-source
+          and runs <strong>locally</strong> — it does not send your cookies anywhere.</li>
+        <li><strong>Sign in to CIS WorkBench:</strong>
+          open <a href="https://workbench.cisecurity.org/" target="_blank" rel="noreferrer">workbench.cisecurity.org</a>
+          and log in with your account.</li>
+        <li><strong>Export:</strong> with that tab open and signed in, click the extension icon
+          (top-right) and press <strong>"Export"</strong>. Format: <strong>Netscape</strong>.</li>
+        <li><strong>Save</strong> the downloaded <code>cookies.txt</code> file.</li>
+      </ol>
+
+      <h2>Firefox</h2>
+      <p>Same as above, but install the <em>"cookies.txt"</em> extension (by Lennon Hill).
+        Open WorkBench while signed in &rarr; click the extension &rarr; export.</p>
+
+      <h2>Upload the file</h2>
+      <ol>
+        <li>Back in the app, under <strong>"1 · CIS WorkBench authentication"</strong>, choose your
+          <code>cookies.txt</code> (Option B).</li>
+        <li>Press <strong>"Sign in"</strong>. The <em>auth</em> badge turns green.</li>
+      </ol>
+      <div class="note">
+        🔒 The app <strong>does not keep</strong> the uploaded file: it deletes it after the
+        session is validated. Treat your <code>cookies.txt</code> as a credential and don't share it.
+      </div>
+
+      <a class="back btn" href="/">&larr; Back to the app</a>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Wraps <a href="https://github.com/mitre/cis-bench" target="_blank" rel="noreferrer">mitre/cis-bench</a> (Apache 2.0).
+  </footer>
+</body>
+</html>

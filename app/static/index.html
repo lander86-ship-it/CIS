@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CIS Benchmark UI</title>
+  <title>CIS Benchmark Console</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -11,80 +11,77 @@
     <div class="brand">
       <span class="logo">🛡️</span>
       <div>
-        <h1>CIS Benchmark UI</h1>
-        <p class="subtitle">Interfaz web para la CLI <code>cis-bench</code></p>
+        <h1>CIS Benchmark Console</h1>
+        <p class="subtitle">Web interface for the <code>cis-bench</code> CLI</p>
       </div>
     </div>
     <div class="status">
-      <span id="cliBadge" class="badge badge--muted">comprobando…</span>
+      <span id="cliBadge" class="badge badge--muted">checking…</span>
       <span id="authBadge" class="badge badge--muted">auth: —</span>
+      <span id="userBadge" class="badge badge--muted"></span>
+      <button id="logoutBtn" class="btn btn--ghost">Log out</button>
     </div>
   </header>
 
   <main class="grid">
-    <!-- Autenticación -->
+    <!-- Authentication -->
     <section class="card">
-      <h2>1 · Autenticación</h2>
+      <h2>1 · CIS WorkBench authentication</h2>
       <p class="hint">
-        Conéctate a
+        Connect to
         <a href="https://workbench.cisecurity.org/" target="_blank" rel="noreferrer">CIS WorkBench</a>
-        de una de estas dos formas. ¿Dudas? &rarr;
-        <a href="/guia-autenticacion.html" target="_blank" rel="noreferrer"><strong>Guía paso a paso</strong></a>.
+        one of two ways. Not sure how? &rarr;
+        <a href="/auth-guide.html" target="_blank" rel="noreferrer"><strong>Step-by-step guide</strong></a>.
       </p>
-      <!-- Opción A: login automático desde el navegador (solo modo nativo) -->
-      <p class="auth-label">Opción A · Automático desde tu navegador</p>
-      <form id="browserForm" class="row">
-        <select id="browser">
+
+      <p class="auth-label">Option A · Automatically from your browser</p>
+      <div class="row">
+        <select id="browser" class="grow" aria-label="Browser">
           <option value="chrome" selected>Chrome</option>
           <option value="firefox">Firefox</option>
           <option value="edge">Edge</option>
           <option value="brave">Brave</option>
-          <option value="chromium">Chromium</option>
           <option value="safari">Safari</option>
         </select>
-        <button type="submit" class="btn">Iniciar sesión con el navegador</button>
-      </form>
-      <p class="hint">
-        Requiere ejecutar la app en <strong>modo nativo</strong>
-        (<code>./run-local.sh</code>) en tu equipo y haber iniciado sesión en
-        WorkBench en ese navegador. Cierra el navegador antes si falla.
-      </p>
+        <button type="submit" class="btn" id="btnBrowser">Sign in</button>
+      </div>
+      <p class="subtle">Requires running the app in native mode on your machine.</p>
 
-      <!-- Opción B: subir cookies.txt (siempre funciona, tambien con Docker) -->
-      <p class="auth-label">Opción B · Subir <code>cookies.txt</code> (siempre funciona)</p>
+      <hr class="divider" />
+      <p class="auth-label">Option B · Upload <code>cookies.txt</code> (always works)</p>
       <form id="loginForm" class="row">
         <input type="file" id="cookiesFile" accept=".txt" required />
-        <button type="submit" class="btn">Iniciar sesión</button>
+        <button type="submit" class="btn">Sign in</button>
       </form>
-      <button id="authStatusBtn" class="btn btn--ghost">Ver estado</button>
+      <button id="authStatusBtn" class="btn btn--ghost">Check status</button>
     </section>
 
-    <!-- Catálogo -->
+    <!-- Catalog -->
     <section class="card">
-      <h2>2 · Catálogo</h2>
-      <p class="hint">Descarga/actualiza el índice de benchmarks (primera vez y periódicamente).</p>
-      <button id="refreshBtn" class="btn">Refrescar catálogo</button>
+      <h2>2 · Catalog</h2>
+      <p class="hint">Download/update the benchmark index (first run and periodically).</p>
+      <button id="refreshBtn" class="btn">Refresh catalog</button>
     </section>
 
-    <!-- Búsqueda -->
+    <!-- Search -->
     <section class="card card--wide">
-      <h2>3 · Buscar</h2>
+      <h2>3 · Search benchmarks</h2>
       <form id="searchForm" class="row">
-        <input type="text" id="query" placeholder="ej. ubuntu 22" class="grow" />
-        <input type="text" id="platformType" placeholder="platform-type (opcional)" />
-        <button type="submit" class="btn">Buscar</button>
+        <input type="text" id="query" placeholder="e.g. ubuntu 22" class="grow" />
+        <input type="text" id="platformType" placeholder="platform-type (optional)" />
+        <button type="submit" class="btn">Search</button>
       </form>
       <div id="searchResults" class="results"></div>
     </section>
 
-    <!-- Exportar -->
+    <!-- Export -->
     <section class="card card--wide">
-      <h2>4 · Exportar / Descargar</h2>
+      <h2>4 · Export / Download</h2>
       <form id="exportForm" class="grid-form">
-        <label>ID o consulta
-          <input type="text" id="identifier" placeholder="23598  ó  ubuntu 22.04" required />
+        <label>ID or query
+          <input type="text" id="identifier" placeholder="23598  or  ubuntu 22.04" required />
         </label>
-        <label>Formato
+        <label>Format
           <select id="fmt">
             <option value="xccdf">XCCDF (XML)</option>
             <option value="yaml">YAML</option>
@@ -93,74 +90,74 @@
             <option value="markdown">Markdown</option>
           </select>
         </label>
-        <label id="styleWrap">Estilo (solo XCCDF)
+        <label id="styleWrap">Style (XCCDF only)
           <select id="style">
             <option value="cis">CIS</option>
             <option value="disa">DISA</option>
             <option value="stig">STIG</option>
           </select>
         </label>
-        <label>Nombre de archivo (opcional)
+        <label>File name (optional)
           <input type="text" id="filename" placeholder="ubuntu.xml" />
         </label>
-        <button type="submit" class="btn">Exportar</button>
+        <button type="submit" class="btn">Export</button>
       </form>
     </section>
 
-    <!-- Generar política (Word, plantilla SABIC) -->
+    <!-- Generate policy (SABIC template) -->
     <section class="card card--wide">
-      <h2><span class="n">5</span> Generar política (Word · plantilla SABIC)</h2>
+      <h2>5 · Generate policy (Word · SABIC template)</h2>
       <p class="hint">
-        Genera un documento Word con la <strong>plantilla, portada y branding de SABIC</strong>
-        y el contenido del benchmark CIS seleccionado: Purpose, Scope, Roles &amp;
-        Responsibilities, Security Requirements (controles con rationale, auditoría y
-        remediación), Compliance &amp; Exceptions y References.
+        Produce a Word document using SABIC's <strong>template, cover page and branding</strong>
+        filled with the selected CIS benchmark: Purpose, Scope, Roles &amp; Responsibilities,
+        Security Requirements (controls with rationale, audit and remediation), Compliance &amp;
+        Exceptions and References.
       </p>
       <div class="grid-form">
-        <label class="field full">ID o nombre del benchmark CIS
-          <input type="text" id="polId" placeholder="23598  ó  Ubuntu 22.04" />
+        <label class="full">CIS benchmark ID or name
+          <input type="text" id="polId" placeholder="23598  or  Ubuntu 22.04" />
         </label>
-        <label class="field">Título de la política (opcional)
+        <label>Policy title (optional)
           <input type="text" id="polTitle" placeholder="Ubuntu 22.04 Security Hardening Standard" />
         </label>
-        <label class="field">Autor
+        <label>Author
           <input type="text" id="polAuthor" placeholder="Corporate Cybersecurity" />
         </label>
-        <label class="field">Versión
+        <label>Version
           <input type="text" id="polVersion" placeholder="1.0" />
         </label>
-        <label class="field">Fuente de datos
+        <label>Data source
           <select id="polFormat">
-            <option value="xccdf" selected>XCCDF (recomendado)</option>
+            <option value="xccdf" selected>XCCDF (recommended)</option>
             <option value="json">JSON</option>
           </select>
         </label>
-        <button type="button" class="btn full" id="btnPolicy">Generar política Word (.docx)</button>
+        <button type="button" class="btn full" id="btnPolicy">Generate Word policy (.docx)</button>
       </div>
     </section>
 
-    <!-- Archivos -->
+    <!-- Files -->
     <section class="card card--wide">
       <div class="row between">
-        <h2>Archivos exportados</h2>
-        <button id="filesBtn" class="btn btn--ghost">Refrescar</button>
+        <h2>Exported files</h2>
+        <button id="filesBtn" class="btn btn--ghost">Refresh</button>
       </div>
-      <ul id="fileList" class="files"><li class="empty">Sin archivos todavía.</li></ul>
+      <ul id="fileList" class="files"><li class="empty">No files yet.</li></ul>
     </section>
 
-    <!-- Consola -->
+    <!-- Console -->
     <section class="card card--wide">
       <div class="row between">
-        <h2>Salida</h2>
-        <button id="clearBtn" class="btn btn--ghost">Limpiar</button>
+        <h2>Output</h2>
+        <button id="clearBtn" class="btn btn--ghost">Clear</button>
       </div>
-      <pre id="console" class="console">Listo.</pre>
+      <pre id="console" class="console">Ready.</pre>
     </section>
   </main>
 
   <footer class="foot">
-    Envuelve <a href="https://github.com/mitre/cis-bench" target="_blank" rel="noreferrer">mitre/cis-bench</a>
-    (Apache 2.0). Este UI solo orquesta la CLI.
+    Wraps <a href="https://github.com/mitre/cis-bench" target="_blank" rel="noreferrer">mitre/cis-bench</a>
+    (Apache 2.0). This UI only orchestrates the CLI.
   </footer>
 
   <script src="/app.js"></script>

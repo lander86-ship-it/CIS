@@ -69,14 +69,15 @@ docker compose up ui        # construye la imagen y arranca el servidor
 
 Abre **http://localhost:8000** (verás la pantalla de login). El flujo es:
 
-1. **Inicia sesión** (usuario/contraseña de `APP_USERS`).
-2. El **catálogo de benchmarks se precarga automáticamente** (si CIS WorkBench
-   está autenticado — las cookies se cargan solas desde `CIS_COOKIES_B64`, o
-   súbelas en el panel *Session*). La primera carga puede tardar unos minutos y
-   se persiste en `/data`.
-3. **Filtra** el catálogo y **selecciona** un benchmark → queda marcado.
-4. Pulsa **Generate policy** en esa fila → genera el Word con la plantilla SABIC
-   (aparece en *Generated policies* para descargar).
+1. **Inicia sesión en la app** (usuario/contraseña de `APP_USERS`).
+2. **Abre sesión en CIS WorkBench** (paso 1) de una de dos formas:
+   **A)** usuario/contraseña (login directo al formulario de WorkBench,
+   *experimental*), o **B)** subiendo tu `cookies.txt`.
+3. **Busca** un benchmark por palabra clave (paso 2). La búsqueda usa el catálogo
+   local de `cis-bench`, que se prepara una vez en 2º plano tras autenticarte y se
+   persiste en `/data`.
+4. **Selecciona** un resultado y pulsa **Generate policy** → genera el Word con la
+   plantilla SABIC (aparece en *Generated policies* para descargar).
 
 Parar: `docker compose down` (o `make down`).
 

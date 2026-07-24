@@ -3,8 +3,8 @@
 const $ = (sel) => document.querySelector(sel);
 const consoleEl = $("#console");
 
-let CATALOG = [];        // all benchmarks
-let selectedId = null;   // currently marked benchmark id
+let RESULTS = [];        // current search results
+let selectedId = null;   // marked benchmark id
 
 // --- utilities -------------------------------------------------------------
 
@@ -33,7 +33,6 @@ async function api(path, opts = {}) {
 }
 function busy(btn, on) { if (btn) btn.disabled = on; }
 
-// tolerant field getters (cis-bench JSON schema may vary)
 const pick = (o, keys) => { for (const k of keys) { if (o[k] != null && o[k] !== "") return o[k]; } return ""; };
 const benchId = (b) => String(pick(b, ["id", "benchmark_id", "workbench_id", "number", "ID"]));
 const benchTitle = (b) => String(pick(b, ["title", "name", "benchmark", "Title"]));
@@ -43,83 +42,121 @@ const benchVersion = (b) => String(pick(b, ["version", "ver", "Version"]));
 // --- session / auth --------------------------------------------------------
 
 async function refreshSession() {
-  try {
-    const s = await api("/api/session");
-    if (s.user) { $("#userBadge").textContent = s.user; }
-  } catch { /* redirected */ }
+  try { const s = await api("/api/session"); if (s.user) $("#userBadge").textContent = s.user; }
+  catch { /* redirected */ }
 }
 $("#logoutBtn").addEventListener("click", async () => {
   await fetch("/api/session/logout", { method: "POST" });
   window.location.href = "/login";
 });
+
 function setAuthUI(active) {
   const badge = $("#authBadge");
   badge.textContent = active ? "auth: active" : "auth: no session";
   badge.className = "badge " + (active ? "badge--ok" : "badge--err");
   const wb = $("#wbStatus");
-  if (wb) {
-    wb.textContent = active ? "session active" : "no session — upload cookies";
-    wb.className = "badge " + (active ? "badge--ok" : "badge--err");
-  }
-  const card = $("#wbCard");
-  if (card) card.classList.toggle("card--attention", !active);
+  wb.textContent = active ? "session active" : "no session";
+  wb.className = "badge " + (active ? "badge--ok" : "badge--err");
+  $("#wbCard").classList.toggle("card--attention", !active);
 }
-
 async function refreshAuth() {
-  try {
-    const res = await api("/api/auth/status");
-    setAuthUI(!!res.ok);
-    return res;
-  } catch { setAuthUI(false); }
+  try { const res = await api("/api/auth/status"); setAuthUI(!!res.ok); return res; }
+  catch { setAuthUI(false); }
   return { ok: false };
 }
 
-// --- catalog ---------------------------------------------------------------
-
-let pollTimer = null, pollCount = 0;
-
-async function loadCatalog() {
-  // The catalog needs an active WorkBench session; prompt if missing.
-  const a = await refreshAuth();
-  if (!a.ok) {
-    clearTimeout(pollTimer);
-    $("#catalogStatus").textContent = "no session";
-    $("#catalog").innerHTML = `<p class="hint">Upload your <code>cookies.txt</code> in the <strong>CIS WorkBench session</strong> panel above to load the catalog.</p>`;
-    return;
-  }
-  $("#catalogStatus").textContent = "loading…";
+// Option A — username/password
+$("#credForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = e.submitter;
+  const fd = new FormData();
+  fd.append("username", $("#wbUser").value.trim());
+  fd.append("password", $("#wbPass").value);
+  if (!$("#wbUser").value.trim() || !$("#wbPass").value) { log("Enter username and password.", "err"); return; }
+  busy(btn, true);
+  log(`Signing in to CIS WorkBench as ${$("#wbUser").value.trim()}…`);
   try {
-    const res = await api("/api/catalog");
-    if (res.status === "ready") {
-      clearTimeout(pollTimer); pollCount = 0;
-      CATALOG = res.benchmarks || [];
-      $("#catalogStatus").textContent = `${CATALOG.length} benchmarks`;
-      renderCatalog();
-      if (!CATALOG.length) $("#catalogHint").textContent = "Catalog is empty. Check authentication, then Reload.";
-    } else if (res.status === "error") {
-      clearTimeout(pollTimer);
-      $("#catalogStatus").textContent = "error";
-      $("#catalog").innerHTML = `<p class="hint">Could not load the catalog: ${escapeHtml(res.error || "unknown error")}. Verify CIS WorkBench authentication (Session panel) and press Reload.</p>`;
+    const res = await api("/api/auth/login-credentials", { method: "POST", body: fd });
+    showResult(res);
+    const a = await refreshAuth();
+    if (a.ok) { $("#wbPass").value = ""; catalogStatus(); }
+  } finally { busy(btn, false); }
+});
+
+// Option B — cookies upload
+$("#cookiesForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = e.submitter;
+  const file = $("#cookiesFile").files[0];
+  if (!file) { log("Choose a cookies.txt file first.", "err"); return; }
+  const fd = new FormData();
+  fd.append("cookies", file);
+  busy(btn, true);
+  log("Uploading cookies and signing in…");
+  try {
+    const res = await api("/api/auth/login", { method: "POST", body: fd });
+    showResult(res);
+    const a = await refreshAuth();
+    if (a.ok) catalogStatus();
+  } finally { busy(btn, false); }
+});
+$("#authStatusBtn").addEventListener("click", async (e) => {
+  busy(e.target, true);
+  const res = await refreshAuth();
+  if (res) showResult(res);
+  busy(e.target, false);
+});
+
+// --- catalog status (needed for search to return results) ------------------
+
+let statusTimer = null;
+async function catalogStatus() {
+  try {
+    const s = await api("/api/catalog/status");
+    const el = $("#catalogStatus");
+    if (s.status === "ready") {
+      el.textContent = s.count ? `catalog ready (${s.count})` : "catalog ready";
+      clearTimeout(statusTimer);
+    } else if (s.status === "refreshing") {
+      el.textContent = "preparing catalog… (first time only)";
+      statusTimer = setTimeout(catalogStatus, 5000);
+    } else if (s.status === "error") {
+      el.textContent = "catalog needs a session";
     } else {
-      // refreshing — poll
-      $("#catalogStatus").textContent = "building catalog… (first load can take a few minutes)";
-      $("#catalogHint").textContent = "Loading the benchmark catalog from CIS WorkBench…";
-      if (pollCount++ < 90) pollTimer = setTimeout(loadCatalog, 5000);
-      else $("#catalogStatus").textContent = "still building… press Reload";
+      el.textContent = "";
     }
   } catch { /* redirected */ }
 }
 
-function renderCatalog() {
-  const q = $("#catalogFilter").value.trim().toLowerCase();
-  const rows = CATALOG.filter((b) => {
-    if (!q) return true;
-    return (benchTitle(b) + " " + benchPlatform(b) + " " + benchId(b)).toLowerCase().includes(q);
-  });
-  const box = $("#catalog");
-  if (!CATALOG.length) { box.innerHTML = `<p class="hint" id="catalogHint">Loading catalog…</p>`; return; }
-  if (!rows.length) { box.innerHTML = `<p class="hint">No benchmarks match "${escapeHtml(q)}".</p>`; return; }
-  const body = rows.slice(0, 500).map((b) => {
+// --- search ----------------------------------------------------------------
+
+$("#searchForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = e.submitter;
+  const q = $("#query").value.trim();
+  if (!q) { log("Type a keyword to search.", "err"); return; }
+  busy(btn, true);
+  $("#results").innerHTML = `<p class="hint">Searching…</p>`;
+  log(`Searching benchmarks for "${q}"…`);
+  try {
+    const res = await api(`/api/search?q=${encodeURIComponent(q)}`);
+    RESULTS = Array.isArray(res.json) ? res.json : [];
+    if (RESULTS.length) {
+      renderRows(RESULTS);
+      log(`${RESULTS.length} result(s).`, "ok");
+    } else if (res.stdout && res.stdout.trim() && !res.ok) {
+      $("#results").innerHTML = `<p class="hint">${escapeHtml(res.stdout.trim() || res.stderr.trim())}</p>`;
+      showResult(res);
+    } else {
+      $("#results").innerHTML = `<p class="hint">No benchmarks matched "${escapeHtml(q)}". If you just signed in, the catalog may still be preparing — check the status next to the heading and retry.</p>`;
+      catalogStatus();
+    }
+  } finally { busy(btn, false); }
+});
+
+function renderRows(list) {
+  const box = $("#results");
+  const body = list.slice(0, 300).map((b) => {
     const id = benchId(b), title = benchTitle(b) || id, plat = benchPlatform(b), ver = benchVersion(b);
     const marked = (id && id === selectedId) ? " row--selected" : "";
     return `<tr class="brow${marked}" data-id="${escapeHtml(id)}" data-title="${escapeHtml(title)}">
@@ -133,41 +170,25 @@ function renderCatalog() {
   }).join("");
   box.innerHTML = `<div class="scroll"><table class="catalog"><thead><tr>
       <th></th><th>ID</th><th>Benchmark</th><th>Platform</th><th>Version</th><th></th>
-    </tr></thead><tbody>${body}</tbody></table></div>
-    ${rows.length > 500 ? `<p class="subtle">Showing first 500 of ${rows.length}. Refine the filter.</p>` : ""}`;
-
+    </tr></thead><tbody>${body}</tbody></table></div>`;
   box.querySelectorAll("tr.brow").forEach((tr) => {
-    const id = tr.getAttribute("data-id");
-    const title = tr.getAttribute("data-title");
-    tr.addEventListener("click", (e) => {
-      if (e.target.classList.contains("genbtn")) return; // button handles itself
-      selectRow(id);
-    });
-    tr.querySelector(".genbtn").addEventListener("click", () => {
-      selectRow(id);
-      generatePolicy(id || title, title);
-    });
+    const id = tr.getAttribute("data-id"), title = tr.getAttribute("data-title");
+    tr.addEventListener("click", (e) => { if (!e.target.classList.contains("genbtn")) selectRow(id); });
+    tr.querySelector(".genbtn").addEventListener("click", () => { selectRow(id); generatePolicy(id || title, title); });
   });
 }
-
 function selectRow(id) {
   selectedId = id;
   document.querySelectorAll("tr.brow").forEach((tr) =>
     tr.classList.toggle("row--selected", tr.getAttribute("data-id") === id));
 }
 
-$("#catalogFilter").addEventListener("input", renderCatalog);
-$("#reloadBtn").addEventListener("click", () => { pollCount = 0; loadCatalog(); });
-
 // --- generate policy -------------------------------------------------------
 
 async function generatePolicy(identifier, label) {
   const fd = new FormData();
   fd.append("identifier", identifier);
-  if ($("#polTitle").value.trim()) fd.append("title", $("#polTitle").value.trim());
-  if ($("#polAuthor").value.trim()) fd.append("author", $("#polAuthor").value.trim());
-  if ($("#polVersion").value.trim()) fd.append("version", $("#polVersion").value.trim());
-  fd.append("src_format", $("#polFormat").value);
+  fd.append("src_format", "xccdf");
   log(`Generating Word policy for "${label || identifier}" (SABIC template)… this can take a while.`);
   const btns = document.querySelectorAll(".genbtn");
   btns.forEach((b) => (b.disabled = true));
@@ -177,40 +198,11 @@ async function generatePolicy(identifier, label) {
       const b = res.benchmark || {};
       log(`Policy generated: ${res.file} — ${b.controls} controls in ${b.sections} sections.`, "ok");
       await loadFiles();
-      const a = document.querySelector(`#fileList a[href$="${encodeURIComponent(res.file)}"]`);
-      if (a) a.scrollIntoView({ behavior: "smooth", block: "center" });
     } else {
       log(res.stderr || res.detail || "Could not generate the policy.", "err");
     }
-  } finally {
-    btns.forEach((b) => (b.disabled = false));
-  }
+  } finally { btns.forEach((b) => (b.disabled = false)); }
 }
-
-// --- session cookies (re-auth on expiry) -----------------------------------
-
-$("#cookiesForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const btn = e.submitter;
-  const file = $("#cookiesFile").files[0];
-  if (!file) { log("Choose a cookies.txt file first.", "err"); return; }
-  const fd = new FormData();
-  fd.append("cookies", file);
-  busy(btn, true);
-  log("Updating CIS WorkBench cookies…");
-  try {
-    const res = await api("/api/auth/login", { method: "POST", body: fd });
-    showResult(res);
-    await refreshAuth();
-    if (res.ok) { pollCount = 0; loadCatalog(); }
-  } finally { busy(btn, false); }
-});
-$("#authStatusBtn").addEventListener("click", async (e) => {
-  busy(e.target, true);
-  const res = await refreshAuth();
-  if (res) showResult(res);
-  busy(e.target, false);
-});
 
 // --- files -----------------------------------------------------------------
 
@@ -232,6 +224,9 @@ $("#clearBtn").addEventListener("click", () => { consoleEl.textContent = "Ready.
 
 // --- init ------------------------------------------------------------------
 
-refreshSession();
-loadCatalog();   // refreshes auth first and gates on it
-loadFiles();
+(async function init() {
+  refreshSession();
+  const a = await refreshAuth();
+  if (a.ok) catalogStatus();
+  loadFiles();
+})();

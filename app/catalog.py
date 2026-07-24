@@ -73,3 +73,12 @@ def ensure_loading() -> None:
             return
         _state.update(status="refreshing", error="")
     threading.Thread(target=_refresh_worker, daemon=True).start()
+
+
+def status_or_start() -> dict:
+    """Cheap status probe. Starts a build only when idle/errored (not every call)."""
+    st = status()
+    if st["status"] in ("idle", "error"):
+        ensure_loading()
+        st = status()
+    return st

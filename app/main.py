@@ -14,7 +14,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
-from . import auth, catalog, cis, cis_parse, policy
+from . import auth, catalog, cis, cis_parse, policy, workbench_login
 
 STATIC_DIR = Path(__file__).parent / "static"
 # Where an uploaded cookies.txt is stored before login.
@@ -136,6 +136,11 @@ async def auth_login(cookies: UploadFile = File(...)):
     finally:
         # Don't keep the raw cookies file around after login.
         dest.unlink(missing_ok=True)
+    if res.ok:
+        try:
+            catalog.ensure_loading()
+        except Exception:  # noqa: BLE001
+            pass
     return res.as_dict()
 
 
@@ -143,6 +148,44 @@ async def auth_login(cookies: UploadFile = File(...)):
 def auth_login_browser(browser: str = Form("chrome")):
     """Authenticate by pulling cookies from a local browser (native mode)."""
     return cis.auth_login_with_browser(browser).as_dict()
+
+
+@app.post("/api/auth/login-credentials")
+def auth_login_credentials(username: str = Form(...), password: str = Form(...)):
+    """Experimental: sign in to CIS WorkBench with username/email + password.
+
+    Performs the WorkBench form login server-side, then feeds the resulting
+    cookies to cis-bench. Falls back message on failure; passwords not logged.
+    """
+    if not username.strip() or not password:
+        raise HTTPException(status_code=400, detail="username and password required")
+    try:
+        cookies_txt, err = workbench_login.login(username.strip(), password)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"ok": False, "stderr": f"Login error: {exc}"},
+                            status_code=502)
+    if not cookies_txt:
+        return JSONResponse({"ok": False, "stderr": err or "Login failed"},
+                            status_code=401)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    dest = DATA_DIR / "cookies.txt"
+    dest.write_text(cookies_txt)
+    try:
+        res = cis.auth_login_with_cookies(dest)
+    finally:
+        dest.unlink(missing_ok=True)
+    if res.ok:
+        try:
+            catalog.ensure_loading()
+        except Exception:  # noqa: BLE001
+            pass
+    return res.as_dict()
+
+
+@app.get("/api/catalog/status")
+def catalog_status():
+    """Lightweight catalog state (starts a background build if idle)."""
+    return catalog.status_or_start()
 
 
 @app.post("/api/catalog/refresh")

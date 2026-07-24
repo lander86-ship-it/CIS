@@ -26,12 +26,32 @@
     <section class="card">
       <h2>1 · Autenticación</h2>
       <p class="hint">
-        Exporta tus cookies de
+        Conéctate a
         <a href="https://workbench.cisecurity.org/" target="_blank" rel="noreferrer">CIS WorkBench</a>
-        como <code>cookies.txt</code> (formato Netscape) y súbelas aquí.
-        ¿No sabes cómo? &rarr;
+        de una de estas dos formas. ¿Dudas? &rarr;
         <a href="/guia-autenticacion.html" target="_blank" rel="noreferrer"><strong>Guía paso a paso</strong></a>.
       </p>
+      <!-- Opción A: login automático desde el navegador (solo modo nativo) -->
+      <p class="auth-label">Opción A · Automático desde tu navegador</p>
+      <form id="browserForm" class="row">
+        <select id="browser">
+          <option value="chrome" selected>Chrome</option>
+          <option value="firefox">Firefox</option>
+          <option value="edge">Edge</option>
+          <option value="brave">Brave</option>
+          <option value="chromium">Chromium</option>
+          <option value="safari">Safari</option>
+        </select>
+        <button type="submit" class="btn">Iniciar sesión con el navegador</button>
+      </form>
+      <p class="hint">
+        Requiere ejecutar la app en <strong>modo nativo</strong>
+        (<code>./run-local.sh</code>) en tu equipo y haber iniciado sesión en
+        WorkBench en ese navegador. Cierra el navegador antes si falla.
+      </p>
+
+      <!-- Opción B: subir cookies.txt (siempre funciona, tambien con Docker) -->
+      <p class="auth-label">Opción B · Subir <code>cookies.txt</code> (siempre funciona)</p>
       <form id="loginForm" class="row">
         <input type="file" id="cookiesFile" accept=".txt" required />
         <button type="submit" class="btn">Iniciar sesión</button>

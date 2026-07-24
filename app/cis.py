@@ -28,6 +28,7 @@ DEFAULT_TIMEOUT = int(os.environ.get("CIS_BENCH_TIMEOUT", "600"))
 # Whitelists — anything outside these is rejected before hitting the CLI.
 VALID_FORMATS = {"yaml", "csv", "json", "markdown", "xccdf"}
 VALID_STYLES = {"cis", "disa", "stig"}
+VALID_BROWSERS = {"chrome", "firefox", "edge", "safari", "brave", "chromium"}
 
 _FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -125,6 +126,18 @@ def auth_status() -> Result:
 
 def auth_login_with_cookies(cookies_path: Path) -> Result:
     return run(["auth", "login", "--cookies", str(cookies_path)], timeout=120)
+
+
+def auth_login_with_browser(browser: str) -> Result:
+    """Log in by extracting session cookies from a local browser.
+
+    Only works when cis-bench runs natively on the user's machine (not inside
+    a container), since it reads the browser's local cookie store.
+    """
+    b = (browser or "").lower().strip()
+    if b not in VALID_BROWSERS:
+        return Result(False, 2, "", f"Unsupported browser: {browser!r}", [])
+    return run(["auth", "login", "--browser", b], timeout=180)
 
 
 def catalog_refresh() -> Result:

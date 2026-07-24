@@ -69,6 +69,28 @@ async function refreshAuth() {
 
 // --- Handlers --------------------------------------------------------------
 
+$("#browserForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = e.submitter;
+  const browser = $("#browser").value;
+  const fd = new FormData();
+  fd.append("browser", browser);
+  busy(btn, true);
+  log(`Extrayendo cookies de ${browser}…`);
+  try {
+    const res = await api("/api/auth/login-browser", { method: "POST", body: fd });
+    showResult(res);
+    if (!res.ok) {
+      log("Si falla: asegúrate de estar en modo nativo (./run-local.sh), " +
+          "de haber iniciado sesión en WorkBench en ese navegador, y prueba a " +
+          "cerrarlo. Si sigue fallando, usa la Opción B (cookies.txt).", "err");
+    }
+    await refreshAuth();
+  } finally {
+    busy(btn, false);
+  }
+});
+
 $("#loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = e.submitter;

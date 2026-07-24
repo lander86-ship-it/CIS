@@ -22,7 +22,17 @@ navegador**, representada por unas *cookies de sesión*.
 
 ---
 
-## Paso a paso
+## Dos formas de hacerlo
+
+- **Opción A — Automático desde el navegador** (más cómoda, solo en modo
+  nativo `./run-local.sh`): en la UI eliges tu navegador y pulsas *Iniciar
+  sesión con el navegador*; la herramienta lee las cookies de tu navegador
+  local. Requiere haber iniciado sesión en WorkBench en ese navegador. Chrome
+  reciente cifra las cookies y a veces falla — entonces usa la Opción B.
+- **Opción B — Exportar `cookies.txt`** (funciona siempre, también con Docker):
+  es lo que se explica a continuación.
+
+## Paso a paso (Opción B)
 
 ### Chrome, Edge o Brave
 

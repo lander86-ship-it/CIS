@@ -111,8 +111,16 @@ sudo ln -s "$(pwd)/scripts/cis-bench" /usr/local/bin/cis-bench
 > [**guía paso a paso**](docs/AUTENTICACION.md) (también accesible desde la UI,
 > en el paso *Autenticación*, o en `http://localhost:8000/guia-autenticacion.html`).
 
-Ni el contenedor ni el servidor tienen navegador, así que se usa el método
-headless oficial con un archivo de cookies en **formato Netscape**:
+Hay dos formas de autenticarte desde la UI:
+
+**Opción A — Automático desde tu navegador** (solo en modo nativo, `./run-local.sh`):
+elige tu navegador (Chrome, Firefox, Edge…) y pulsa *Iniciar sesión con el
+navegador*. `cis-bench` extrae las cookies de tu navegador local. Requiere haber
+iniciado sesión en WorkBench en ese navegador; si Chrome falla por el cifrado de
+cookies, cierra el navegador o usa la Opción B.
+
+**Opción B — Subir `cookies.txt`** (funciona siempre, también con Docker):
+método headless oficial con un archivo de cookies en **formato Netscape**:
 
 1. Inicia sesión en <https://workbench.cisecurity.org/> en tu navegador.
 2. Exporta las cookies con una extensión tipo *"Get cookies.txt LOCALLY"*.

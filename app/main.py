@@ -55,6 +55,12 @@ async def auth_login(cookies: UploadFile = File(...)):
     return res.as_dict()
 
 
+@app.post("/api/auth/login-browser")
+def auth_login_browser(browser: str = Form("chrome")):
+    """Authenticate by pulling cookies from a local browser (native mode)."""
+    return cis.auth_login_with_browser(browser).as_dict()
+
+
 @app.post("/api/catalog/refresh")
 def catalog_refresh():
     return cis.catalog_refresh().as_dict()

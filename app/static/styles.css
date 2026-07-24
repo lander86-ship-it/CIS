@@ -82,6 +82,8 @@ code { font-family: var(--mono); font-size: 0.9em; }
 .card--wide { grid-column: 1 / -1; }
 .card h2 { margin: 0 0 0.5rem; font-size: 1.02rem; }
 .hint { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.75rem; }
+.auth-label { font-size: 0.82rem; font-weight: 700; margin: 0.9rem 0 0.4rem; color: var(--text); }
+.auth-label:first-of-type { margin-top: 0.4rem; }
 
 .row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
 .row.between { justify-content: space-between; }

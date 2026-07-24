@@ -256,20 +256,22 @@ def _roles(roles_tbl_template, nar=None):
 
 
 def _security_requirements(bench: Benchmark):
+    titled = sum(1 for s in bench.sections if s.title.strip())
     out = [_p("Security Requirements", style=H1)]
+    sec_phrase = (f" across {titled} section(s)" if titled else "")
     out.append(_p(
         f"This section defines the mandatory security controls for "
         f"{bench.platform or 'in-scope systems'}, derived from the {bench.title}"
         + (f" (version {bench.version})" if bench.version else "")
-        + f". It contains {bench.control_count} control(s) across "
-        f"{len(bench.sections)} section(s). Each control lists its assurance "
-        "level, rationale, the audit procedure used to verify it, and the "
-        "remediation required to meet it. All controls are mandatory unless a "
-        "formal exception has been approved (see Compliance & Exceptions)."))
+        + f". It contains {bench.control_count} control(s){sec_phrase}. Each "
+        "control lists its assurance level, rationale, the audit procedure used "
+        "to verify it, and the remediation required to meet it. All controls "
+        "are mandatory unless a formal exception has been approved (see "
+        "Compliance & Exceptions)."))
     for sec in bench.sections:
-        out.append(_p(f"{sec.number} {sec.title}".strip(), style=H2))
-        if not sec.controls:
-            out.append(_p("No individual controls are defined in this section."))
+        heading = f"{sec.number} {sec.title}".strip()
+        if heading:  # untitled sections (junk stripped) render with no heading
+            out.append(_p(heading, style=H2))
         for c in sec.controls:
             lvl = f" (Level {c.level})" if c.level else ""
             out.append(_p(f"{c.number} {c.title}{lvl}".strip(), style=H3))

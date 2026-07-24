@@ -14,6 +14,7 @@ rather than raising, so the policy generator always has something to render.
 
 from __future__ import annotations
 
+import html
 import json
 import re
 
@@ -23,6 +24,15 @@ from .policy import Benchmark, Control, Section
 
 # XCCDF appears in several namespace versions; match by local-name instead.
 _LEVEL_RE = re.compile(r"level\s*([12])|\bL([12])\b", re.I)
+
+# Text sanitizers: some exports (e.g. STIG-styled XCCDF) embed XML fragments in
+# titles, and CIS control text is authored in Markdown (code fences, backticks,
+# bold). Strip all of that so the Word document reads cleanly.
+_TAG_RE = re.compile(r"<[^>]+>")
+_FENCE_RE = re.compile(r"```[^\n`]*")          # ``` and optional language tag
+_BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")       # **bold** -> bold
+_EMPH_RE = re.compile(r"(?<![\w`])_([^_`\n]+)_(?![\w])")  # _italic_ -> italic
+_VID_RE = re.compile(r"^[A-Za-z]{0,3}-?\d+$")   # V-12345 / 12345 style ids
 
 
 def _lname(el) -> str:
@@ -45,7 +55,26 @@ def _all_text(el) -> str:
 
 
 def _clean(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "")).strip()
+    """Strip embedded XML tags and Markdown noise; collapse whitespace."""
+    if not s:
+        return ""
+    s = html.unescape(s)
+    s = _TAG_RE.sub(" ", s)        # drop <GroupDescription> etc.
+    s = _FENCE_RE.sub(" ", s)      # drop ``` code-fence markers
+    s = _BOLD_RE.sub(r"\1", s)     # **bold** -> bold
+    s = _EMPH_RE.sub(r"\1", s)     # _italic_ -> italic
+    s = s.replace("`", " ")        # drop inline backticks
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _meaningful(title: str) -> bool:
+    """True if a section title is descriptive (not empty, a tag, or an id)."""
+    t = _clean(title)
+    if len(re.sub(r"[^A-Za-z]", "", t)) < 3:  # needs real words
+        return False
+    if _VID_RE.match(t.replace(" ", "")):
+        return False
+    return True
 
 
 def _level_from(*texts) -> str:
@@ -91,32 +120,33 @@ def parse_xccdf(data: bytes) -> Benchmark:
                        level=level, rationale=rationale, audit=audit,
                        remediation=remediation, impact=impact)
 
-    def walk(group, path_titles):
-        # A Group maps to a section; its direct Rules are its controls.
-        gnum = _group_number(group)
+    # Collect (section_title, control) in document order. Group titles that are
+    # not descriptive (STIG junk like "<GroupDescription></GroupDescription>",
+    # bare V-ids) are ignored — such rules inherit the nearest meaningful
+    # ancestor title, or fall into an untitled section (rendered with no H2).
+    ordered: list[tuple[str, Control]] = []
+
+    def walk(group, inherited: str):
         gtitle = _first_text(group, "title")
-        direct_rules = [c for c in group if _lname(c) == "Rule"]
-        if direct_rules:
-            sec = Section(number=gnum, title=gtitle or "Section")
-            for r in direct_rules:
-                sec.controls.append(rule_to_control(r))
-            sections.append(sec)
+        current = _clean(gtitle) if _meaningful(gtitle) else inherited
         for child in group:
-            if _lname(child) == "Group":
-                walk(child, path_titles + [gtitle])
+            if _lname(child) == "Rule":
+                ordered.append((current, rule_to_control(child)))
+            elif _lname(child) == "Group":
+                walk(child, current)
 
     top_groups = [c for c in bench_el if _lname(c) == "Group"]
-    if top_groups:
-        for g in top_groups:
-            walk(g, [])
-    else:
-        # No groups: put all rules in one section.
-        rules = _find_all(bench_el, "Rule")
-        if rules:
-            sec = Section(number="1", title=title)
-            for r in rules:
-                sec.controls.append(rule_to_control(r))
-            sections.append(sec)
+    for g in top_groups:
+        walk(g, "")
+    for r in [c for c in bench_el if _lname(c) == "Rule"]:  # rules w/o a group
+        ordered.append(("", rule_to_control(r)))
+
+    # Merge consecutive controls that share a section title, preserving order.
+    # Untitled sections (STIG junk stripped) render with no heading.
+    for sec_title, ctrl in ordered:
+        if not sections or sections[-1].title != sec_title:
+            sections.append(Section(number="", title=sec_title))
+        sections[-1].controls.append(ctrl)
 
     return Benchmark(id=_short_id(bench_id), title=title, version=version,
                      platform=_platform_from_title(title), sections=sections)

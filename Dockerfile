@@ -38,9 +38,10 @@ RUN pip install --no-cache-dir -r requirements.txt \
 # App code.
 COPY app ./app
 
-# State + work volumes.
+# State + work directories. (No Docker VOLUME instruction: Railway rejects it
+# and manages persistence via its own Volumes; local compose bind-mounts these.
+# Attach a Railway Volume at /data to persist the session + catalog.db.)
 RUN mkdir -p /data/.cis-bench /work
-VOLUME ["/data", "/work"]
 
 RUN cis-bench --version || true
 

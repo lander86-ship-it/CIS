@@ -188,6 +188,27 @@ def catalog_status():
     return catalog.status_or_start()
 
 
+def _trunc(res, n=4000):
+    d = res.as_dict()
+    for k in ("stdout", "stderr"):
+        if d.get(k) and len(d[k]) > n:
+            d[k] = d[k][:n] + f"\n…(+{len(d[k]) - n} chars)"
+    return d
+
+
+@app.get("/api/diagnostics")
+def diagnostics(q: str = "ubuntu"):
+    """Raw cis-bench output for troubleshooting search/catalog issues."""
+    return {
+        "cli_available": cis.cli_available(),
+        "auth_status": _trunc(cis.auth_status()),
+        "catalog_state": catalog.status(),
+        "list_json": _trunc(cis.run(["list", "--output-format", "json"], timeout=60)),
+        "search_json": _trunc(cis.run(["search", q, "--output-format", "json"], timeout=60)),
+        "search_plain": _trunc(cis.run(["search", q], timeout=60)),
+    }
+
+
 @app.post("/api/catalog/refresh")
 def catalog_refresh():
     return cis.catalog_refresh().as_dict()

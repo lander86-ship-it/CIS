@@ -128,6 +128,35 @@ async function catalogStatus() {
   } catch { /* redirected */ }
 }
 
+// --- prepare catalog / diagnostics -----------------------------------------
+
+$("#prepBtn").addEventListener("click", async (e) => {
+  busy(e.target, true);
+  log("Preparing the local catalog (cis-bench catalog refresh)… first time can take minutes.");
+  try {
+    const s = await api("/api/catalog/status");
+    log(`Catalog status: ${s.status}${s.count ? ` (${s.count})` : ""}${s.error ? " — " + s.error : ""}`, s.status === "ready" ? "ok" : (s.status === "error" ? "err" : ""));
+    catalogStatus();
+  } finally { busy(e.target, false); }
+});
+
+$("#diagBtn").addEventListener("click", async (e) => {
+  busy(e.target, true);
+  const q = $("#query").value.trim() || "ubuntu";
+  log(`Running diagnostics (query "${q}")…`);
+  try {
+    const d = await api(`/api/diagnostics?q=${encodeURIComponent(q)}`);
+    log("— cli_available: " + d.cli_available);
+    log("— catalog_state: " + JSON.stringify(d.catalog_state));
+    const dump = (name, r) => { if (!r) return; log(`— ${name}: rc=${r.returncode}`); if (r.stdout && r.stdout.trim()) log(r.stdout.trim().slice(0, 1200)); if (r.stderr && r.stderr.trim()) log(r.stderr.trim().slice(0, 800), "err"); };
+    dump("auth status", d.auth_status);
+    dump("list --output-format json", d.list_json);
+    dump("search json", d.search_json);
+    dump("search plain", d.search_plain);
+    log("Diagnostics done. If this looks off, copy the Output and send it over.", "ok");
+  } finally { busy(e.target, false); }
+});
+
 // --- search ----------------------------------------------------------------
 
 $("#searchForm").addEventListener("submit", async (e) => {
@@ -140,15 +169,16 @@ $("#searchForm").addEventListener("submit", async (e) => {
   log(`Searching benchmarks for "${q}"…`);
   try {
     const res = await api(`/api/search?q=${encodeURIComponent(q)}`);
-    RESULTS = Array.isArray(res.json) ? res.json : [];
+    showResult(res); // always surface the raw cis-bench output
+    RESULTS = Array.isArray(res.json) ? res.json : (res.json && Array.isArray(res.json.results) ? res.json.results : []);
     if (RESULTS.length) {
       renderRows(RESULTS);
       log(`${RESULTS.length} result(s).`, "ok");
-    } else if (res.stdout && res.stdout.trim() && !res.ok) {
-      $("#results").innerHTML = `<p class="hint">${escapeHtml(res.stdout.trim() || res.stderr.trim())}</p>`;
-      showResult(res);
+    } else if (res.stdout && res.stdout.trim()) {
+      // Non-JSON (plain text) results — show them raw so nothing is hidden.
+      $("#results").innerHTML = `<pre class="console">${escapeHtml(res.stdout.trim())}</pre>`;
     } else {
-      $("#results").innerHTML = `<p class="hint">No benchmarks matched "${escapeHtml(q)}". If you just signed in, the catalog may still be preparing — check the status next to the heading and retry.</p>`;
+      $("#results").innerHTML = `<p class="hint">No benchmarks matched "${escapeHtml(q)}". If you just signed in, the catalog may still be preparing — press <strong>Prepare catalog</strong> and retry. Use <strong>Diagnose</strong> to see what cis-bench reports.</p>`;
       catalogStatus();
     }
   } finally { busy(btn, false); }

@@ -56,7 +56,11 @@
     <section class="card card--wide">
       <div class="row between">
         <h2>2 · Find a benchmark</h2>
-        <span id="catalogStatus" class="subtle"></span>
+        <div class="row">
+          <span id="catalogStatus" class="subtle"></span>
+          <button type="button" id="prepBtn" class="btn btn--ghost">Prepare catalog</button>
+          <button type="button" id="diagBtn" class="btn btn--ghost">Diagnose</button>
+        </div>
       </div>
       <form id="searchForm" class="row">
         <input type="search" id="query" class="grow" placeholder="Search by keyword — e.g. ubuntu, windows server, kubernetes…" />

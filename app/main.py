@@ -269,6 +269,7 @@ def export(
 def generate_policy(
     identifier: str = Form(...),
     title: str | None = Form(None),
+    bench_title: str | None = Form(None),
     author: str = Form("Corporate Cybersecurity"),
     version: str = Form("1.0"),
     src_format: str = Form("xccdf"),
@@ -304,6 +305,11 @@ def generate_policy(
     # Prefer the ID the user actually selected.
     if identifier.isdigit():
         bench.id = identifier
+    # The catalog/search result carries the authoritative benchmark name; use
+    # it (the XCCDF title can be missing or generic on STIG-styled exports).
+    if bench_title and bench_title.strip():
+        bench.title = bench_title.strip()
+        bench.platform = cis_parse._platform_from_title(bench.title) or bench.platform
 
     if bench.control_count == 0:
         return JSONResponse(
@@ -335,9 +341,9 @@ def generate_policy(
             {"ok": False, "stderr": f"Policy generation failed: {exc}"},
             status_code=500)
 
-    safe = re.sub(r"[^A-Za-z0-9._-]+", "_",
-                  meta.title or bench.title)[:50].strip("_")
-    out_name = f"{safe or 'policy'}.docx"
+    # File name: <CIS benchmark name>_YYYYMMDD.docx
+    base = re.sub(r"[^A-Za-z0-9._-]+", "_", bench.title or "policy")[:60].strip("_")
+    out_name = f"{base or 'policy'}_{date.today().strftime('%Y%m%d')}.docx"
     out_path = cis.WORK_DIR / out_name
     out_path.write_bytes(doc)
 

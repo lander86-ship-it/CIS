@@ -233,6 +233,7 @@ async function refreshAi() {
 async function generatePolicy(identifier, label) {
   const fd = new FormData();
   fd.append("identifier", identifier);
+  if (label) fd.append("bench_title", label);   // authoritative CIS benchmark name
   fd.append("src_format", "xccdf");
   fd.append("use_ai", $("#polAi") && $("#polAi").checked ? "true" : "false");
   log(`Generating Word policy for "${label || identifier}" (SABIC template)… this can take a while.`);

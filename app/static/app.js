@@ -187,6 +187,32 @@ $("#exportForm").addEventListener("submit", async (e) => {
   }
 });
 
+$("#btnPolicy").addEventListener("click", async (e) => {
+  const btn = e.target;
+  const id = $("#polId").value.trim();
+  if (!id) { log("Indica el ID o nombre del benchmark CIS para la política.", "err"); return; }
+  const fd = new FormData();
+  fd.append("identifier", id);
+  if ($("#polTitle").value.trim()) fd.append("title", $("#polTitle").value.trim());
+  if ($("#polAuthor").value.trim()) fd.append("author", $("#polAuthor").value.trim());
+  if ($("#polVersion").value.trim()) fd.append("version", $("#polVersion").value.trim());
+  fd.append("src_format", $("#polFormat").value);
+  busy(btn, true);
+  log(`Generando política Word desde "${id}" (plantilla SABIC)… esto puede tardar.`);
+  try {
+    const res = await api("/api/policy", { method: "POST", body: fd });
+    if (res.ok) {
+      const b = res.benchmark || {};
+      log(`Política generada: ${res.file} — ${b.controls} controles en ${b.sections} secciones (${b.title}).`, "ok");
+      await loadFiles();
+    } else {
+      log(res.stderr || res.detail || "No se pudo generar la política.", "err");
+    }
+  } finally {
+    busy(btn, false);
+  }
+});
+
 $("#filesBtn").addEventListener("click", loadFiles);
 $("#clearBtn").addEventListener("click", () => { consoleEl.textContent = "Listo."; });
 

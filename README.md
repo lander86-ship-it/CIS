@@ -87,6 +87,41 @@ exportaciones en `./work`, igual que con Docker. Cambia el puerto con
 
 ---
 
+## Generar una política Word (plantilla SABIC + contenido CIS)
+
+Desde la UI, paso **5 · Generar política**: introduce el ID o nombre de un
+benchmark CIS y la app produce un documento **Word (.docx) con la plantilla,
+portada, fuentes y branding de SABIC** rellenada con el contenido del benchmark:
+
+- Portada, cabecera/pie con logo, disclaimer, índice (TOC) y Version History de SABIC
+- **Purpose** y **Scope** redactados y adaptados al benchmark y su plataforma
+- **Roles & Responsibilities** (tabla con el estilo de SABIC)
+- **Security Requirements**: los controles CIS agrupados por sección, cada uno con
+  nivel (L1/L2), *rationale*, *audit* y *remediation*
+- **Compliance & Exceptions** y **References**
+
+Internamente: la app exporta el benchmark con `cis-bench` (XCCDF, con *fallback*
+a JSON), lo parsea y reescribe el cuerpo de la plantilla SABIC conservando el
+resto del paquete intacto (mismos estilos y tema). El TOC se marca para que Word
+lo regenere al abrir el documento.
+
+> La plantilla vive en `app/templates/sabic_template.docx`. Reemplázala por otra
+> versión si SABIC actualiza su formato (se conservan los nombres de estilo
+> `Ttulo1/2/3`, la tabla *Role | Responsibilities* y la de *Version History*).
+
+Vía API:
+
+```bash
+curl -X POST http://localhost:8000/api/policy \
+  -F identifier=23598 \
+  -F "title=Ubuntu 22.04 Security Hardening Standard" \
+  -F author="Corporate Cybersecurity" \
+  -F src_format=xccdf
+# -> { "file": "...docx", "download_url": "/api/files/...docx", "benchmark": {...} }
+```
+
+---
+
 ## Opción C — CLI (Docker)
 
 ```bash
@@ -149,6 +184,7 @@ La UI consume esta API (útil también para automatizar):
 | `GET`  | `/api/search?q=&platform_type=` | Buscar benchmarks |
 | `GET`  | `/api/list` | Listar catálogo (JSON) |
 | `POST` | `/api/export` | Exportar (`identifier`, `fmt`, `style`, `filename`) |
+| `POST` | `/api/policy` | Generar política Word SABIC (`identifier`, `title`, `author`, `version`, `src_format`) |
 | `GET`  | `/api/files` | Listar archivos exportados |
 | `GET`  | `/api/files/{name}` | Descargar un archivo |
 

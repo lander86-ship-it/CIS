@@ -3,3 +3,6 @@ cis-bench==0.5.2
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 python-multipart==0.0.20
+# Policy generator (SABIC .docx templating): lxml preserves the template's
+# namespaces/styles when rewriting the document body.
+lxml==5.3.0

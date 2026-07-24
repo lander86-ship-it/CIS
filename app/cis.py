@@ -210,6 +210,25 @@ def export(
     return res, (out_path if out_path.exists() else None)
 
 
+def export_bytes(identifier: str, fmt: str) -> tuple[Result, bytes | None]:
+    """Export a benchmark to a hidden temp file and return its raw bytes.
+
+    Used to feed the policy generator. The temp file name starts with '.' so
+    it does not appear in the downloadable files list.
+    """
+    ext = {"xccdf": "xml", "json": "json", "yaml": "yaml",
+           "csv": "csv", "markdown": "md"}.get(fmt, "dat")
+    safe = _FILENAME_RE.sub("_", identifier)[:40].strip("_") or "benchmark"
+    tmp_name = f".policy-src-{safe}.{ext}"
+    res, out_path = export(identifier, fmt, style="cis", filename=tmp_name)
+    if out_path is not None and out_path.exists():
+        try:
+            return res, out_path.read_bytes()
+        finally:
+            out_path.unlink(missing_ok=True)
+    return res, None
+
+
 def list_files() -> list[dict]:
     """List downloadable files in WORK_DIR."""
     WORK_DIR.mkdir(parents=True, exist_ok=True)

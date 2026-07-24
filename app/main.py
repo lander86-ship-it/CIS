@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import os
+import re
+from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import cis
+from . import cis, cis_parse, policy
 
 STATIC_DIR = Path(__file__).parent / "static"
 # Where an uploaded cookies.txt is stored before login.
@@ -97,6 +99,88 @@ def export(
         payload["file"] = out_path.name
         payload["download_url"] = f"/api/files/{out_path.name}"
     return JSONResponse(payload)
+
+
+@app.post("/api/policy")
+def generate_policy(
+    identifier: str = Form(...),
+    title: str | None = Form(None),
+    author: str = Form("Corporate Cybersecurity"),
+    version: str = Form("1.0"),
+    src_format: str = Form("xccdf"),
+):
+    """Generate a SABIC-styled Word policy from a selected CIS benchmark.
+
+    Exports the benchmark via cis-bench (XCCDF preferred, JSON fallback),
+    parses it, and renders it into the SABIC template.
+    """
+    identifier = identifier.strip()
+    if not identifier:
+        raise HTTPException(status_code=400, detail="identifier is required")
+
+    # 1) Pull the benchmark content from cis-bench.
+    fmt = src_format if src_format in ("xccdf", "json") else "xccdf"
+    res, data = cis.export_bytes(identifier, fmt)
+    if data is None and fmt == "xccdf":
+        fmt = "json"
+        res, data = cis.export_bytes(identifier, "json")
+    if data is None:
+        payload = res.as_dict() if res else {"ok": False, "stderr": "export failed"}
+        payload["detail"] = ("cis-bench could not export this benchmark. "
+                             "Check authentication and the benchmark ID.")
+        return JSONResponse(payload, status_code=502)
+
+    # 2) Parse into the normalised model.
+    try:
+        bench = cis_parse.parse_benchmark(data, fmt)
+    except Exception as exc:  # noqa: BLE001 - surface any parse issue
+        return JSONResponse(
+            {"ok": False, "stderr": f"Could not parse {fmt} export: {exc}"},
+            status_code=422)
+
+    # Prefer the ID the user actually selected.
+    if identifier.isdigit():
+        bench.id = identifier
+
+    if bench.control_count == 0:
+        return JSONResponse(
+            {"ok": False,
+             "stderr": "No controls were found in the benchmark export. "
+                       "Try the other source format or verify the benchmark.",
+             "parsed": {"title": bench.title, "sections": len(bench.sections)}},
+            status_code=422)
+
+    # 3) Render the policy into the SABIC template.
+    meta = policy.PolicyMeta(
+        title=(title or "").strip(),
+        version=version.strip() or "1.0",
+        author=author.strip() or "Corporate Cybersecurity",
+        date=date.today().strftime("%d/%m/%Y"),
+    )
+    try:
+        doc = policy.build_policy(bench, meta)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse(
+            {"ok": False, "stderr": f"Policy generation failed: {exc}"},
+            status_code=500)
+
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_",
+                  meta.title or bench.title)[:50].strip("_")
+    out_name = f"{safe or 'policy'}.docx"
+    out_path = cis.WORK_DIR / out_name
+    out_path.write_bytes(doc)
+
+    return {
+        "ok": True,
+        "file": out_name,
+        "download_url": f"/api/files/{out_name}",
+        "source_format": fmt,
+        "benchmark": {
+            "id": bench.id, "title": bench.title, "version": bench.version,
+            "platform": bench.platform, "sections": len(bench.sections),
+            "controls": bench.control_count,
+        },
+    }
 
 
 @app.get("/api/files")

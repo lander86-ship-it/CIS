@@ -107,6 +107,38 @@
       </form>
     </section>
 
+    <!-- Generar política (Word, plantilla SABIC) -->
+    <section class="card card--wide">
+      <h2><span class="n">5</span> Generar política (Word · plantilla SABIC)</h2>
+      <p class="hint">
+        Genera un documento Word con la <strong>plantilla, portada y branding de SABIC</strong>
+        y el contenido del benchmark CIS seleccionado: Purpose, Scope, Roles &amp;
+        Responsibilities, Security Requirements (controles con rationale, auditoría y
+        remediación), Compliance &amp; Exceptions y References.
+      </p>
+      <div class="grid-form">
+        <label class="field full">ID o nombre del benchmark CIS
+          <input type="text" id="polId" placeholder="23598  ó  Ubuntu 22.04" />
+        </label>
+        <label class="field">Título de la política (opcional)
+          <input type="text" id="polTitle" placeholder="Ubuntu 22.04 Security Hardening Standard" />
+        </label>
+        <label class="field">Autor
+          <input type="text" id="polAuthor" placeholder="Corporate Cybersecurity" />
+        </label>
+        <label class="field">Versión
+          <input type="text" id="polVersion" placeholder="1.0" />
+        </label>
+        <label class="field">Fuente de datos
+          <select id="polFormat">
+            <option value="xccdf" selected>XCCDF (recomendado)</option>
+            <option value="json">JSON</option>
+          </select>
+        </label>
+        <button type="button" class="btn full" id="btnPolicy">Generar política Word (.docx)</button>
+      </div>
+    </section>
+
     <!-- Archivos -->
     <section class="card card--wide">
       <div class="row between">

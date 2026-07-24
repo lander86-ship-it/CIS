@@ -206,6 +206,7 @@ def diagnostics(q: str = "ubuntu"):
         "list_json": _trunc(cis.run(["list", "--output-format", "json"], timeout=60)),
         "search_json": _trunc(cis.run(["search", q, "--output-format", "json"], timeout=60)),
         "search_plain": _trunc(cis.run(["search", q], timeout=60)),
+        "export_help": _trunc(cis.run(["export", "--help"], timeout=30)),
     }
 
 
@@ -280,16 +281,14 @@ def generate_policy(
     if not identifier:
         raise HTTPException(status_code=400, detail="identifier is required")
 
-    # 1) Pull the benchmark content from cis-bench.
-    fmt = src_format if src_format in ("xccdf", "json") else "xccdf"
+    # 1) Pull the benchmark content from cis-bench as XCCDF (the only
+    #    structured format `cis-bench export` supports that we can parse).
+    fmt = "xccdf"
     res, data = cis.export_bytes(identifier, fmt)
-    if data is None and fmt == "xccdf":
-        fmt = "json"
-        res, data = cis.export_bytes(identifier, "json")
     if data is None:
         payload = res.as_dict() if res else {"ok": False, "stderr": "export failed"}
-        payload["detail"] = ("cis-bench could not export this benchmark. "
-                             "Check authentication and the benchmark ID.")
+        payload["detail"] = ("cis-bench could not export this benchmark as XCCDF. "
+                             "Check authentication and the benchmark ID. Raw error above.")
         return JSONResponse(payload, status_code=502)
 
     # 2) Parse into the normalised model.

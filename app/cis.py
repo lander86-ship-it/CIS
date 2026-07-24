@@ -144,6 +144,11 @@ def catalog_refresh() -> Result:
     return run(["catalog", "refresh"])
 
 
+def download(identifier: str) -> Result:
+    """Download/cache a benchmark by ID so it can be exported."""
+    return run(["download", identifier.strip()], timeout=DEFAULT_TIMEOUT)
+
+
 def search(query: str, platform_type: str | None = None) -> Result:
     """Search the catalog. Tries JSON output, falls back to plain text."""
     base = ["search"]
@@ -214,19 +219,29 @@ def export_bytes(identifier: str, fmt: str) -> tuple[Result, bytes | None]:
     """Export a benchmark to a hidden temp file and return its raw bytes.
 
     Used to feed the policy generator. The temp file name starts with '.' so
-    it does not appear in the downloadable files list.
+    it does not appear in the downloadable files list. For XCCDF we try with
+    the CIS style first, then without (in case --style is unsupported).
     """
-    ext = {"xccdf": "xml", "json": "json", "yaml": "yaml",
-           "csv": "csv", "markdown": "md"}.get(fmt, "dat")
+    ext = {"xccdf": "xml", "yaml": "yaml", "csv": "csv",
+           "markdown": "md"}.get(fmt, "xml")
     safe = _FILENAME_RE.sub("_", identifier)[:40].strip("_") or "benchmark"
     tmp_name = f".policy-src-{safe}.{ext}"
-    res, out_path = export(identifier, fmt, style="cis", filename=tmp_name)
-    if out_path is not None and out_path.exists():
-        try:
-            return res, out_path.read_bytes()
-        finally:
-            out_path.unlink(missing_ok=True)
-    return res, None
+    # `export` operates on locally-cached benchmarks, so ensure it's downloaded
+    # first (numeric IDs). For text queries, export() uses `get`, which itself
+    # downloads. Best-effort: ignore the download result.
+    if identifier.strip().isdigit():
+        download(identifier)
+    styles = ["cis", None] if fmt == "xccdf" else [None]
+    last: Result | None = None
+    for style in styles:
+        res, out_path = export(identifier, fmt, style=style, filename=tmp_name)
+        last = res
+        if out_path is not None and out_path.exists():
+            try:
+                return res, out_path.read_bytes()
+            finally:
+                out_path.unlink(missing_ok=True)
+    return last, None
 
 
 def list_files() -> list[dict]:

@@ -14,6 +14,11 @@ work
 *.cookies
 cookies.txt
 
+# Python / venv — never copy into the image
+.venv
+__pycache__
+*.pyc
+
 # Editor / OS noise
 .DS_Store
 .idea

@@ -1,4 +1,4 @@
-# Handy shortcuts for the containerized CIS Benchmark CLI.
+# Handy shortcuts for the CIS Benchmark app (CLI + Web UI).
 # `make help` lists everything.
 
 IMAGE ?= cis-bench:local
@@ -6,7 +6,7 @@ COMPOSE ?= docker compose
 
 .DEFAULT_GOAL := help
 
-.PHONY: help build rebuild auth-status login shell version clean
+.PHONY: help build rebuild up down logs login auth-status version shell local clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -18,17 +18,29 @@ build: ## Build the container image
 rebuild: ## Rebuild the image from scratch (no cache)
 	$(COMPOSE) build --no-cache
 
-login: ## Authenticate headless with a Netscape cookies file at ./data/cookies.txt
-	$(COMPOSE) run --rm cis-bench auth login --cookies /data/cookies.txt
+up: ## Start the Web UI at http://localhost:8000
+	$(COMPOSE) up ui
 
-auth-status: ## Show current authentication status
-	$(COMPOSE) run --rm cis-bench auth status
+down: ## Stop the Web UI
+	$(COMPOSE) down
 
-version: ## Print the CLI version inside the container
-	$(COMPOSE) run --rm cis-bench --version
+logs: ## Tail the Web UI logs
+	$(COMPOSE) logs -f ui
 
-shell: ## Open a shell inside the container (debugging)
-	$(COMPOSE) run --rm --entrypoint /bin/bash cis-bench
+login: ## CLI: headless login with ./data/cookies.txt
+	$(COMPOSE) run --rm cli auth login --cookies /data/cookies.txt
+
+auth-status: ## CLI: show authentication status
+	$(COMPOSE) run --rm cli auth status
+
+version: ## CLI: print the cis-bench version
+	$(COMPOSE) run --rm cli --version
+
+shell: ## Open a shell inside the image (debugging)
+	$(COMPOSE) run --rm --entrypoint /bin/bash cli
+
+local: ## Run the Web UI natively (no Docker) via ./run-local.sh
+	./run-local.sh
 
 clean: ## Remove the built image (keeps ./data and ./work)
 	-docker image rm $(IMAGE)

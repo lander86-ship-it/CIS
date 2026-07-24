@@ -1,0 +1,5 @@
+# Web UI + API wrapper around the cis-bench CLI.
+cis-bench==0.5.2
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20

@@ -23,7 +23,7 @@ cd "${ROOT_DIR}"
 # Prefer docker compose (keeps env + volumes in one place); fall back to
 # plain `docker run` if compose is unavailable.
 if docker compose version &>/dev/null; then
-  exec docker compose run --rm cis-bench "$@"
+  exec docker compose run --rm cli "$@"
 else
   exec docker run --rm -it \
     -v "${ROOT_DIR}/data:/data" \

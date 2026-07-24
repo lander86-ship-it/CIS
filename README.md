@@ -1,190 +1,194 @@
-# CIS Benchmark CLI — Contenedor (local / on-premise)
+# CIS Benchmark — CLI + Interfaz Web (local / on-premise)
 
-Contenerización de la herramienta [`mitre/cis-bench`](https://github.com/mitre/cis-bench):
-una **CLI en Python** para descargar, gestionar y exportar benchmarks de seguridad
-CIS desde [CIS WorkBench](https://workbench.cisecurity.org/) a múltiples formatos
-(YAML, CSV, JSON, Markdown, XCCDF / DISA STIG).
+Empaqueta la herramienta [`mitre/cis-bench`](https://github.com/mitre/cis-bench)
+(una **CLI en Python** para descargar y exportar benchmarks de seguridad CIS
+desde [CIS WorkBench](https://workbench.cisecurity.org/)) y le añade una
+**interfaz web (UI)** para usarla desde el navegador.
 
-Este repositorio **no reimplementa** la herramienta: la empaqueta en una imagen
-Docker reproducible para ejecutarla on-premise sin instalar Python 3.12 ni las
-dependencias en la máquina anfitriona.
+Puedes ejecutarlo de tres maneras, todas **en local / on-premise**:
 
-> ℹ️ `cis-bench` es una herramienta de **línea de comandos**, no un servicio web.
-> El contenedor no expone puertos; solo hace peticiones HTTPS salientes a CIS
-> WorkBench. Se ejecuta bajo demanda (`docker compose run --rm ...`), no con `up`.
+| Modo | Cómo | Requisitos |
+|------|------|-----------|
+| 🌐 **Web UI (Docker)** | `docker compose up ui` → http://localhost:8000 | Docker |
+| 🌐 **Web UI (nativo)** | `./run-local.sh` → http://localhost:8000 | Python 3.12+ |
+| ⌨️ **CLI (Docker)** | `docker compose run --rm cli <args>` | Docker |
 
----
-
-## Requisitos
-
-- Docker Engine 20.10+ con el plugin **Docker Compose v2** (`docker compose`).
-- Una cuenta en **CIS WorkBench** (gratuita) para autenticarte.
+No expone servicios a Internet: solo hace peticiones **HTTPS salientes** a CIS
+WorkBench. El servidor web escucha en `localhost:8000`.
 
 ---
 
-## Estructura del repo
+## Arquitectura
+
+```
+Navegador ──HTTP──> FastAPI (app/main.py) ──subprocess──> cis-bench (CLI) ──HTTPS──> CIS WorkBench
+                          │                                     │
+                       app/static/ (UI)                 ~/.cis-bench (sesión + catalog.db)
+```
+
+El backend **no reimplementa** nada: envuelve la CLI de forma segura
+(`subprocess`, sin shell, con listas de argumentos validadas) y sirve una UI
+estática. Los archivos exportados se guardan en el volumen de trabajo y se
+descargan desde el navegador.
 
 ```
 .
-├── Dockerfile            # Imagen basada en python:3.12-slim + cis-bench (pip)
-├── docker-compose.yml    # Servicio "cis-bench" con volúmenes ./data y ./work
-├── Makefile              # Atajos: build, login, auth-status, shell, ...
+├── Dockerfile            # Imagen python:3.12-slim: cis-bench + FastAPI/uvicorn
+├── docker-compose.yml    # Servicios: ui (web) y cli (one-shot)
+├── requirements.txt      # cis-bench + fastapi + uvicorn + python-multipart
+├── run-local.sh          # Ejecutar la Web UI sin Docker (crea venv)
+├── Makefile              # Atajos: build, up, login, ...
+├── app/
+│   ├── main.py           # FastAPI: API REST + sirve la UI
+│   ├── cis.py            # Wrapper seguro alrededor de la CLI
+│   └── static/           # index.html, styles.css, app.js
 ├── scripts/cis-bench     # Wrapper para usar la CLI como si fuera nativa
-├── data/                 # (volumen) sesión + catalog.db  — NO se commitea
-├── work/                 # (volumen) archivos exportados  — NO se commitea
-└── .env.example          # Variables de entorno de ejemplo
+├── data/                 # (volumen) sesión + catalog.db — NO se commitea
+└── work/                 # (volumen) archivos exportados — NO se commitea
 ```
 
-Rutas dentro del contenedor:
-
-| Host      | Contenedor | Contenido                                   |
-|-----------|------------|---------------------------------------------|
-| `./data`  | `/data`    | Sesión (`.cis-bench/session.cookies`) + `catalog.db` (persistente) |
-| `./work`  | `/work`    | Archivos exportados (directorio de trabajo) |
-
-`HOME=/data` dentro del contenedor, por lo que el estado de la app (`~/.cis-bench`)
-vive en `./data/.cis-bench` y persiste entre ejecuciones.
+Rutas dentro del contenedor: `./data → /data` (`HOME`, estado de la app) y
+`./work → /work` (`CIS_WORK_DIR`, exportaciones). Ambos volúmenes se comparten
+entre la UI y la CLI, así que **autenticarte en cualquiera vale para las dos**.
 
 ---
 
-## 1. Construir la imagen
+## Opción A — Web UI con Docker (recomendada)
 
 ```bash
-docker compose build
-# o:  make build
+docker compose up ui        # construye la imagen y arranca el servidor
+# o en segundo plano:  docker compose up -d ui   /   make up
 ```
 
-Para fijar otra versión de la CLI:
+Abre **http://localhost:8000**. La UI tiene 4 pasos:
 
-```bash
-docker compose build --build-arg CIS_BENCH_VERSION=0.5.2
-```
+1. **Autenticación** — sube tu `cookies.txt` (ver más abajo).
+2. **Catálogo** — botón *Refrescar catálogo* (primera vez / periódicamente).
+3. **Buscar** — busca benchmarks por texto o `platform-type`.
+4. **Exportar** — elige ID/consulta, formato y estilo → genera un archivo
+   descargable (aparece en *Archivos exportados*).
 
-Verifica:
-
-```bash
-docker compose run --rm cis-bench --version
-# o:  make version
-```
+Parar: `docker compose down` (o `make down`).
 
 ---
 
-## 2. Autenticarse (modo headless con cookies)
+## Opción B — Web UI nativa (sin Docker)
 
-El contenedor **no tiene navegador**, así que no puede extraer cookies
-automáticamente como la instalación nativa. Se usa el método headless oficial
-con un archivo de cookies en **formato Netscape (`cookies.txt`)**:
-
-1. Inicia sesión en <https://workbench.cisecurity.org/> en tu navegador.
-2. Exporta las cookies con una extensión tipo *"Get cookies.txt / cookies.txt LOCALLY"*.
-3. Guarda el archivo como **`data/cookies.txt`** en este repo.
-4. Ejecuta:
-
-   ```bash
-   docker compose run --rm cis-bench auth login --cookies /data/cookies.txt
-   # o:  make login
-   ```
-
-La sesión queda guardada en `data/.cis-bench/session.cookies` y persiste.
-Comprueba el estado:
+Requiere **Python 3.12+** en la máquina.
 
 ```bash
-docker compose run --rm cis-bench auth status
-# o:  make auth-status
+./run-local.sh              # crea .venv, instala deps y arranca el servidor
+# o:  make local
 ```
 
-> 🔒 `data/cookies.txt`, `*.cookies` y `.env` están en `.gitignore`: no se
-> suben al repositorio. Bórralo del host cuando termines si lo prefieres.
-
-> ¿Ya tienes una instalación nativa autenticada? Copia tu
-> `~/.cis-bench/session.cookies` del host a `./data/.cis-bench/session.cookies`
-> y omite el paso de login.
+Abre **http://localhost:8000**. El estado se guarda en `./data` y las
+exportaciones en `./work`, igual que con Docker. Cambia el puerto con
+`PORT=9000 ./run-local.sh`.
 
 ---
 
-## 3. Usar la CLI
-
-Con `docker compose run --rm`:
+## Opción C — CLI (Docker)
 
 ```bash
-# Refrescar el catálogo (primera vez / periódicamente)
-docker compose run --rm cis-bench catalog refresh
-
-# Buscar
-docker compose run --rm cis-bench search "ubuntu 22"
-docker compose run --rm cis-bench search --platform-type cloud
-
-# Descargar un benchmark por ID
-docker compose run --rm cis-bench download 23598
-
-# Exportar a un archivo (queda en ./work del host)
-docker compose run --rm cis-bench export 23598 --format csv -o /work/output.csv
-docker compose run --rm cis-bench get "ubuntu 22.04" --format xccdf --style cis -o /work/ubuntu.xml
+docker compose run --rm cli auth login --cookies /data/cookies.txt
+docker compose run --rm cli search "ubuntu 22"
+docker compose run --rm cli get "ubuntu 22.04" --format xccdf --style cis -o /work/ubuntu.xml
 ```
 
-### Wrapper (más cómodo)
-
-`scripts/cis-bench` monta los volúmenes por ti y se comporta como la CLI nativa:
+O con el wrapper (se comporta como la CLI nativa):
 
 ```bash
 ./scripts/cis-bench search "ubuntu 22"
-./scripts/cis-bench get "ubuntu 22.04" --format xccdf --style cis -o /work/ubuntu.xml
-```
-
-Opcional — instalarlo en tu `PATH`:
-
-```bash
+# opcional: instalarlo en el PATH
 sudo ln -s "$(pwd)/scripts/cis-bench" /usr/local/bin/cis-bench
-cis-bench --help
 ```
+
+---
+
+## Autenticación (headless con cookies)
+
+Ni el contenedor ni el servidor tienen navegador, así que se usa el método
+headless oficial con un archivo de cookies en **formato Netscape**:
+
+1. Inicia sesión en <https://workbench.cisecurity.org/> en tu navegador.
+2. Exporta las cookies con una extensión tipo *"Get cookies.txt LOCALLY"*.
+3. **Desde la UI**: súbelas en el paso *Autenticación*.
+   **Desde la CLI**: guárdalas como `data/cookies.txt` y ejecuta
+   `docker compose run --rm cli auth login --cookies /data/cookies.txt`
+   (o `make login`).
+
+La sesión queda en `data/.cis-bench/session.cookies` y persiste. La UI no
+conserva el `cookies.txt` subido: lo borra tras iniciar sesión.
+
+> 🔒 `cookies.txt`, `*.cookies` y `.env` están en `.gitignore` y `.dockerignore`.
+
+---
+
+## API REST
+
+La UI consume esta API (útil también para automatizar):
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET`  | `/api/health` | Estado de la CLI y del servidor |
+| `GET`  | `/api/auth/status` | Estado de autenticación |
+| `POST` | `/api/auth/login` | Login (multipart: `cookies`) |
+| `POST` | `/api/catalog/refresh` | Refrescar catálogo |
+| `GET`  | `/api/search?q=&platform_type=` | Buscar benchmarks |
+| `GET`  | `/api/list` | Listar catálogo (JSON) |
+| `POST` | `/api/export` | Exportar (`identifier`, `fmt`, `style`, `filename`) |
+| `GET`  | `/api/files` | Listar archivos exportados |
+| `GET`  | `/api/files/{name}` | Descargar un archivo |
+
+Docs interactivas (Swagger) en **http://localhost:8000/docs**.
 
 ---
 
 ## Configuración
 
-Copia `.env.example` a `.env` (lo lee `docker compose`):
+| Variable | Valores | Descripción |
+|----------|---------|-------------|
+| `CIS_BENCH_ENV` | `production` (def), `dev`, `test` | Directorio de datos (`~/.cis-bench`, ...) |
+| `CIS_BENCH_SSL_VERIFY` | `true` (def), `false` | `false` solo detrás de proxy con TLS interception |
+| `CIS_BENCH_VERSION` | ej. `0.5.2` | Versión de la CLI a instalar (build arg) |
+| `CIS_WORK_DIR` | ruta | Dónde se escriben las exportaciones (def `/work`) |
+| `PORT` | ej. `8000` | Puerto del servidor en modo nativo |
 
-```bash
-cp .env.example .env
-```
-
-| Variable               | Valores                     | Descripción                                        |
-|------------------------|-----------------------------|----------------------------------------------------|
-| `CIS_BENCH_ENV`        | `production` (def), `dev`, `test` | Selecciona el directorio de datos (`~/.cis-bench`, `~/.cis-bench-dev`, temp). |
-| `CIS_BENCH_SSL_VERIFY` | `true` (def), `false`       | Pon `false` solo detrás de un proxy que intercepta TLS. |
-| `CIS_BENCH_VERSION`    | ej. `0.5.2`                 | Versión de la CLI a instalar (build arg).          |
+Copia `.env.example` a `.env` (lo lee `docker compose`).
 
 ---
 
-## Comandos útiles del Makefile
+## Makefile
 
 ```bash
 make help          # Lista todos los atajos
 make build         # Construir la imagen
-make rebuild       # Reconstruir sin caché
-make login         # Login headless con ./data/cookies.txt
-make auth-status   # Ver estado de autenticación
-make version       # Versión de la CLI
-make shell         # Shell dentro del contenedor (debug)
-make clean         # Borrar la imagen (conserva ./data y ./work)
+make up            # Web UI (Docker) en :8000
+make down          # Parar la Web UI
+make local         # Web UI nativa (sin Docker)
+make login         # CLI: login headless con ./data/cookies.txt
+make auth-status   # CLI: estado de autenticación
+make shell         # Shell dentro de la imagen (debug)
+make clean         # Borrar la imagen
 ```
 
 ---
 
-## Notas y solución de problemas
+## Solución de problemas
 
-- **Persistencia:** todo el estado vive en `./data`. Bórralo para empezar de cero.
-- **Permisos de archivos exportados:** el contenedor corre como `root`; los
-  archivos en `./work` pueden pertenecer a `root`. Ajusta con
-  `sudo chown -R "$USER" work/` si hace falta, o usa `--user "$(id -u):$(id -g)"`.
-- **Sesión caducada:** vuelve a exportar `cookies.txt` y repite el paso 2.
-- **Proxy corporativo con TLS interception:** exporta `CIS_BENCH_SSL_VERIFY=false`
-  (solo si es imprescindible).
+- **"CLI no encontrada" en la UI:** en modo nativo necesitas Python 3.12+
+  (la instala `run-local.sh` dentro del venv). Con Docker, reconstruye:
+  `docker compose build --no-cache`.
+- **Permisos en `./work`:** el contenedor corre como `root`; ajusta con
+  `sudo chown -R "$USER" work/` o añade `--user "$(id -u):$(id -g)"`.
+- **Sesión caducada:** vuelve a exportar `cookies.txt` y repite el login.
+- **Proxy con TLS interception:** `CIS_BENCH_SSL_VERIFY=false` (solo si es
+  imprescindible).
 
 ---
 
 ## Créditos y licencia
 
-La herramienta `cis-bench` es de **MITRE** y se distribuye bajo **Apache 2.0**
-(ver [mitre/cis-bench](https://github.com/mitre/cis-bench)). Este repositorio
-solo aporta el empaquetado en contenedor.
+`cis-bench` es de **MITRE**, bajo **Apache 2.0** (ver
+[mitre/cis-bench](https://github.com/mitre/cis-bench)). Este repositorio
+aporta el empaquetado en contenedor y la interfaz web.

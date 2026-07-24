@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CIS Benchmark UI</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🛡️</span>
+      <div>
+        <h1>CIS Benchmark UI</h1>
+        <p class="subtitle">Interfaz web para la CLI <code>cis-bench</code></p>
+      </div>
+    </div>
+    <div class="status">
+      <span id="cliBadge" class="badge badge--muted">comprobando…</span>
+      <span id="authBadge" class="badge badge--muted">auth: —</span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- Autenticación -->
+    <section class="card">
+      <h2>1 · Autenticación</h2>
+      <p class="hint">
+        El contenedor no tiene navegador. Exporta tus cookies de
+        <a href="https://workbench.cisecurity.org/" target="_blank" rel="noreferrer">CIS WorkBench</a>
+        como <code>cookies.txt</code> (formato Netscape) y súbelas aquí.
+      </p>
+      <form id="loginForm" class="row">
+        <input type="file" id="cookiesFile" accept=".txt" required />
+        <button type="submit" class="btn">Iniciar sesión</button>
+      </form>
+      <button id="authStatusBtn" class="btn btn--ghost">Ver estado</button>
+    </section>
+
+    <!-- Catálogo -->
+    <section class="card">
+      <h2>2 · Catálogo</h2>
+      <p class="hint">Descarga/actualiza el índice de benchmarks (primera vez y periódicamente).</p>
+      <button id="refreshBtn" class="btn">Refrescar catálogo</button>
+    </section>
+
+    <!-- Búsqueda -->
+    <section class="card card--wide">
+      <h2>3 · Buscar</h2>
+      <form id="searchForm" class="row">
+        <input type="text" id="query" placeholder="ej. ubuntu 22" class="grow" />
+        <input type="text" id="platformType" placeholder="platform-type (opcional)" />
+        <button type="submit" class="btn">Buscar</button>
+      </form>
+      <div id="searchResults" class="results"></div>
+    </section>
+
+    <!-- Exportar -->
+    <section class="card card--wide">
+      <h2>4 · Exportar / Descargar</h2>
+      <form id="exportForm" class="grid-form">
+        <label>ID o consulta
+          <input type="text" id="identifier" placeholder="23598  ó  ubuntu 22.04" required />
+        </label>
+        <label>Formato
+          <select id="fmt">
+            <option value="xccdf">XCCDF (XML)</option>
+            <option value="yaml">YAML</option>
+            <option value="csv">CSV</option>
+            <option value="json">JSON</option>
+            <option value="markdown">Markdown</option>
+          </select>
+        </label>
+        <label id="styleWrap">Estilo (solo XCCDF)
+          <select id="style">
+            <option value="cis">CIS</option>
+            <option value="disa">DISA</option>
+            <option value="stig">STIG</option>
+          </select>
+        </label>
+        <label>Nombre de archivo (opcional)
+          <input type="text" id="filename" placeholder="ubuntu.xml" />
+        </label>
+        <button type="submit" class="btn">Exportar</button>
+      </form>
+    </section>
+
+    <!-- Archivos -->
+    <section class="card card--wide">
+      <div class="row between">
+        <h2>Archivos exportados</h2>
+        <button id="filesBtn" class="btn btn--ghost">Refrescar</button>
+      </div>
+      <ul id="fileList" class="files"><li class="empty">Sin archivos todavía.</li></ul>
+    </section>
+
+    <!-- Consola -->
+    <section class="card card--wide">
+      <div class="row between">
+        <h2>Salida</h2>
+        <button id="clearBtn" class="btn btn--ghost">Limpiar</button>
+      </div>
+      <pre id="console" class="console">Listo.</pre>
+    </section>
+  </main>
+
+  <footer class="foot">
+    Envuelve <a href="https://github.com/mitre/cis-bench" target="_blank" rel="noreferrer">mitre/cis-bench</a>
+    (Apache 2.0). Este UI solo orquesta la CLI.
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
